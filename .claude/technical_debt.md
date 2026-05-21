@@ -1,11 +1,11 @@
 # Technical Debt & Issues
 
-## Critical
+## Critical (Resolved)
 
-### 1. Hardcoded API Keys
-- **Where**: `NetworkModule.kt:20` (ORS API key as Base64 string), `MapWidget.kt:26` (Mapy.cz tile API key)
-- **Risk**: Keys are committed to source control. Anyone with repo access can extract and abuse them. ORS key is especially sensitive (paid API with usage limits).
-- **Proper approach**: Move all keys to `local.properties` → `BuildConfig` (as already done for `MAPY_CZ_API_KEY` in `AppModule`).
+### 1. Hardcoded API Keys [RESOLVED]
+- **Status**: Resolved. All keys are now stored in `local.properties` (which is excluded from Git tracking) and are injected into the build via `BuildConfig` (exposed as `BuildConfig.ORS_API_KEY` and `BuildConfig.MAPY_CZ_API_KEY`).
+- **Where**: Was in `NetworkModule.kt` and `MapWidget.kt`.
+- **Approach**: Used `local.properties` -> `BuildConfig` generation in `app/build.gradle.kts`.
 
 ### 2. fallbackToDestructiveMigration() Enabled
 - **Where**: `DatabaseModule.kt:41`

@@ -22,7 +22,7 @@ UI (Compose screens) → ViewModel (StateFlow) → Repository (interfaces) → D
 DI wires everything via 3 Hilt modules: `AppModule`, `DatabaseModule`, `NetworkModule`.
 
 ## Key limitations and issues (important for agents)
-1. **Hardcoded API keys** — ORS key in `NetworkModule.kt:20`, Mapy.cz tile key in `MapWidget.kt:26`. Must be moved to `local.properties` → `BuildConfig`.
+1. **Hardcoded API keys** — [RESOLVED] Moved to `local.properties` → `BuildConfig`.
 2. **`fallbackToDestructiveMigration()` enabled** in `DatabaseModule.kt:41` — will silently destroy all user data if a migration path is missing.
 3. **StationListViewModel breaks clean architecture** — directly injects `ShortcutDao`, `PoiDao`, `StationDao` alongside repository interfaces.
 4. **No test coverage** — only boilerplate example tests exist. No regression protection for business logic.

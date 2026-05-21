@@ -42,7 +42,7 @@ com.example.stationinspector/
 ```
 
 ## ⚠️ Найкритичніший борг (must read)
-1. **Hardcoded API keys** — [NetworkModule.kt:20](../app/src/main/java/com/example/stationinspector/di/NetworkModule.kt), [MapWidget.kt:26](../app/src/main/java/com/example/stationinspector/ui/components/MapWidget.kt).
+1. **Hardcoded API keys** — [ВИРІШЕНО] Перенесено до `local.properties` → `BuildConfig`.
 2. **`fallbackToDestructiveMigration()`** — [DatabaseModule.kt:41](../app/src/main/java/com/example/stationinspector/di/DatabaseModule.kt) → видаляє дані юзера.
 3. **Немає тестів** — лише boilerplate.
 4. **`StationListViewModel`** ламає clean architecture (інжектить DAO напряму).
