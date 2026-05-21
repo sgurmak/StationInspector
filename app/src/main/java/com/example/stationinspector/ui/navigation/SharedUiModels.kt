@@ -25,21 +25,29 @@ import com.example.stationinspector.ui.theme.clickableNoRipple
 //  Bottom Navigation Item & Bar
 // ─────────────────────────────────────────────────────────────────────────────
 
+enum class MainTab {
+    STATION_LIST,
+    MAP,
+    EXPORT,
+    SETTINGS
+}
+
 data class BottomNavItem(
+    val tab:   MainTab,
     val label: String,
     val icon:  ImageVector
 )
 
 @Composable
 fun BottomNavBar(
-    selectedTab:   Int,
-    onTabSelected: (Int) -> Unit
+    selectedTab:   MainTab,
+    onTabSelected: (MainTab) -> Unit
 ) {
     val items = listOf(
-        BottomNavItem("Work",     Icons.Default.Home),
-        BottomNavItem("Map",      Icons.Default.Map),
-        BottomNavItem("Export",   Icons.Default.Share),
-        BottomNavItem("Settings", Icons.Default.Settings)
+        BottomNavItem(MainTab.STATION_LIST, "Work",     Icons.Default.Home),
+        BottomNavItem(MainTab.MAP,          "Map",      Icons.Default.Map),
+        BottomNavItem(MainTab.EXPORT,       "Export",   Icons.Default.Share),
+        BottomNavItem(MainTab.SETTINGS,     "Settings", Icons.Default.Settings)
     )
 
     Column(
@@ -59,9 +67,9 @@ fun BottomNavBar(
             verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            items.forEachIndexed { index, item ->
-                val isSelected = index == selectedTab
-                val clickAction: () -> Unit = { onTabSelected(index) }
+            items.forEach { item ->
+                val isSelected = item.tab == selectedTab
+                val clickAction: () -> Unit = { onTabSelected(item.tab) }
 
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,

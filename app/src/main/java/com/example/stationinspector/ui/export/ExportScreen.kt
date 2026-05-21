@@ -3,11 +3,8 @@ package com.example.stationinspector.ui.export
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.composed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.FileDownload
@@ -20,10 +17,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.stationinspector.domain.model.Photo
 import com.example.stationinspector.domain.model.PhotoType
+import com.example.stationinspector.ui.theme.StationInspectorTheme
+import com.example.stationinspector.ui.theme.clickableNoRipple
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -36,6 +37,13 @@ private val ExLight       = Color(0xFFFBF7FF)   // Text on dark bg, icons on dar
 private val ExDark        = Color(0xFF261937)   // Card content, button bg
 private val ExAccent      = Color(0xFFCA065E)   // Defect accent, progress indicator
 private val ExCardBg      = Color(0xFFFBF7FF)   // Info card background
+
+private data class ExportStats(
+    val defectPhotos: List<Photo>,
+    val normalPhotos: List<Photo>,
+    val defectStationCount: Int,
+    val normalStationCount: Int
+)
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  ExportScreen — redesigned per spec (transparent bg, gradient from parent)
@@ -52,7 +60,6 @@ fun ExportScreen(
     val context           = LocalContext.current
     val state             by viewModel.state.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
-    val scope             = rememberCoroutineScope()
 
     // ── Date setup ────────────────────────────────────────────────────────────
     LaunchedEffect(dateStr) {
@@ -87,22 +94,54 @@ fun ExportScreen(
                 viewModel.resetState()
             }
             ExportState.ERROR -> {
-                launch {
-                    snackbarHostState.showSnackbar(
-                        message  = "An error occurred. Check your connection or try again.",
-                        duration = SnackbarDuration.Short
-                    )
-                }
+                snackbarHostState.showSnackbar(
+                    message  = "An error occurred. Check your connection or try again.",
+                    duration = SnackbarDuration.Short
+                )
             }
             else -> {}
         }
     }
 
-    // ── Statistics (computed from photo list exactly as before) ───────────────
-    val defectPhotos        = state.photos.filter { it.type == PhotoType.INTERNAL_DEFECT }
-    val normalPhotos        = state.photos.filter { it.type != PhotoType.INTERNAL_DEFECT }
-    val defectStationCount  = defectPhotos.map { it.stationId }.distinct().count()
-    val normalStationCount  = normalPhotos.map { it.stationId }.distinct().count()
+    ExportScreenContent(
+        dateStr           = dateStr,
+        exportState       = state.exportState,
+        photos            = state.photos,
+        snackbarHostState = snackbarHostState,
+        onBackClick       = onBackClick,
+        onExportClick     = { viewModel.startExport() },
+        contentPadding    = contentPadding
+    )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  ExportScreenContent — Stateless screen layout
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+fun ExportScreenContent(
+    dateStr:           String,
+    exportState:       ExportState,
+    photos:            List<Photo>,
+    snackbarHostState: SnackbarHostState,
+    onBackClick:       () -> Unit,
+    onExportClick:     () -> Unit,
+    modifier:          Modifier = Modifier,
+    contentPadding:    PaddingValues = PaddingValues()
+) {
+    // ── Statistics (computed from photo list using remember) ──────────────────
+    val stats = remember(photos) {
+        val defect = photos.filter { it.type == PhotoType.INTERNAL_DEFECT }
+        val normal = photos.filter { it.type != PhotoType.INTERNAL_DEFECT }
+        val defectCount = defect.map { it.stationId }.distinct().count()
+        val normalCount = normal.map { it.stationId }.distinct().count()
+        ExportStats(
+            defectPhotos       = defect,
+            normalPhotos       = normal,
+            defectStationCount = defectCount,
+            normalStationCount = normalCount
+        )
+    }
 
     // ── Formatted date header (dd.MM) ─────────────────────────────────────────
     val formattedDate: String = remember(dateStr) {
@@ -112,7 +151,7 @@ fun ExportScreen(
     }
 
     // ── Root: transparent — gradient comes from MainAppScreen ─────────────────
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -194,7 +233,7 @@ fun ExportScreen(
                             color      = ExDark
                         )
                         Text(
-                            text       = "${normalPhotos.size} photos \u2022 $normalStationCount rail station",
+                            text       = "${stats.normalPhotos.size} photos \u2022 ${stats.normalStationCount} rail station",
                             fontSize   = 12.sp,
                             fontWeight = FontWeight.SemiBold,
                             color      = ExDark
@@ -212,7 +251,7 @@ fun ExportScreen(
                             color      = ExAccent
                         )
                         Text(
-                            text       = "${defectPhotos.size} photos \u2022 $defectStationCount rail station",
+                            text       = "${stats.defectPhotos.size} photos \u2022 ${stats.defectStationCount} rail station",
                             fontSize   = 12.sp,
                             fontWeight = FontWeight.SemiBold,
                             color      = ExAccent
@@ -231,12 +270,12 @@ fun ExportScreen(
                                 .height(40.dp)
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(
-                                    if (state.exportState == ExportState.RUNNING)
+                                    if (exportState == ExportState.RUNNING)
                                         ExDark.copy(alpha = 0.5f) else ExDark
                                 )
                                 .then(
-                                    if (state.exportState != ExportState.RUNNING)
-                                        Modifier.clickableNoRipple { viewModel.startExport() }
+                                    if (exportState != ExportState.RUNNING)
+                                        Modifier.clickableNoRipple(onClick = onExportClick)
                                     else Modifier
                                 ),
                             contentAlignment = Alignment.Center
@@ -283,7 +322,7 @@ fun ExportScreen(
             hostState = snackbarHostState,
             modifier  = Modifier.align(Alignment.TopCenter)
         ) { data ->
-            val snackColor = if (state.exportState == ExportState.ERROR)
+            val snackColor = if (exportState == ExportState.ERROR)
                 Color(0xFFEF4444) else Color(0xFF16A34A)
             Snackbar(
                 snackbarData   = data,
@@ -293,7 +332,7 @@ fun ExportScreen(
         }
 
         // ── Loading overlay ───────────────────────────────────────────────────
-        if (state.exportState == ExportState.RUNNING) {
+        if (exportState == ExportState.RUNNING) {
             Box(
                 modifier         = Modifier
                     .fillMaxSize()
@@ -306,14 +345,21 @@ fun ExportScreen(
     }
 }
 
-// ────────────────────────────────────────────────────────────────────────────────
-//  Clickable without ripple (local helper)
-// ────────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+//  Preview
+// ─────────────────────────────────────────────────────────────────────────────
 
-private fun Modifier.clickableNoRipple(onClick: () -> Unit): Modifier = composed {
-    clickable(
-        interactionSource = remember { MutableInteractionSource() },
-        indication        = null,
-        onClick           = onClick
-    )
+@Preview(showBackground = true)
+@Composable
+private fun ExportScreenContentPreview() {
+    StationInspectorTheme {
+        ExportScreenContent(
+            dateStr           = "2026-05-21",
+            exportState       = ExportState.IDLE,
+            photos            = emptyList(),
+            snackbarHostState = remember { SnackbarHostState() },
+            onBackClick       = {},
+            onExportClick     = {}
+        )
+    }
 }

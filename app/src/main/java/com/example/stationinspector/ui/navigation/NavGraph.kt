@@ -64,7 +64,6 @@ fun StationInspectorNavGraph(
                         navController.navigate("camera/$stationId/${PhotoZone.ENTRANCE.name}")
                     }
                 },
-                onExportClick   = { dateStr -> navController.navigate("export/$dateStr") },
                 onNavigateToPoi = { lat, lon, name ->
                     val uri       = Uri.parse("geo:$lat,$lon?q=${Uri.encode(name)}")
                     val mapIntent = Intent(Intent.ACTION_VIEW, uri)
