@@ -9,3 +9,11 @@ val Pink80 = Color(0xFFEFB8C8)
 val Purple40 = Color(0xFF6650a4)
 val PurpleGrey40 = Color(0xFF625b71)
 val Pink40 = Color(0xFF7D5260)
+
+// Global design colors
+val ContentLight = Color(0xFFFBF7FF)
+val CardContent = Color(0xFF261937)
+val NavBarBg = Color(0xFF13111B)
+val ContentDark = Color(0xFF13111B)
+val AppGradientTop = Color(0xFF392153)
+val AppGradientBottom = Color(0xFF13111B)

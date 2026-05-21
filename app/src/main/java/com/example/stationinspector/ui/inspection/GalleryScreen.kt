@@ -2,7 +2,6 @@ package com.example.stationinspector.ui.inspection
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -51,12 +50,15 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.example.stationinspector.domain.model.PhotoType
 import com.example.stationinspector.domain.model.PhotoZone
+import com.example.stationinspector.ui.navigation.ZONE_LIST
+import com.example.stationinspector.ui.navigation.ZoneMeta
+import com.example.stationinspector.ui.theme.AppGradientTop
+import com.example.stationinspector.ui.theme.AppGradientBottom
+import com.example.stationinspector.ui.theme.ContentLight
+import com.example.stationinspector.ui.theme.ContentDark
+import com.example.stationinspector.ui.theme.clickableNoRipple
 import java.io.File
 
-private val AppGradientTop    = Color(0xFF392153)
-private val AppGradientBottom = Color(0xFF13111A)
-private val ContentLight      = Color(0xFFFBF7FF)
-private val ContentDark       = Color(0xFF13111B)
 private val AccentRed         = Color(0xFFCA065E)
 private val AccentGreen       = Color(0xFF47DC7A)
 
@@ -131,11 +133,7 @@ fun GalleryScreen(
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            onClick = onAddPhotoClick
-                        )
+                        .clickableNoRipple(onClick = onAddPhotoClick)
                         .padding(horizontal = 8.dp)
                 ) {
                     Icon(
@@ -172,11 +170,7 @@ fun GalleryScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier
                             .clip(RoundedCornerShape(20.dp))
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                onClick = { viewModel.selectZone(meta.zone) }
-                            )
+                            .clickableNoRipple { viewModel.selectZone(meta.zone) }
                             .then(
                                 if (isActive) Modifier.background(ContentLight, RoundedCornerShape(20.dp))
                                 else Modifier
@@ -265,11 +259,7 @@ fun GalleryScreen(
                 val isPhotosActive = currentMode == PhotoType.CLIENT_REPORT
                 Box(
                     modifier = Modifier
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            onClick = { currentMode = PhotoType.CLIENT_REPORT }
-                        )
+                        .clickableNoRipple { currentMode = PhotoType.CLIENT_REPORT }
                         .then(
                             if (isPhotosActive) Modifier.background(ContentLight, RoundedCornerShape(16.dp))
                             else Modifier
@@ -290,11 +280,7 @@ fun GalleryScreen(
                 val isDefectsActive = currentMode == PhotoType.INTERNAL_DEFECT
                 Box(
                     modifier = Modifier
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            onClick = { currentMode = PhotoType.INTERNAL_DEFECT }
-                        )
+                        .clickableNoRipple { currentMode = PhotoType.INTERNAL_DEFECT }
                         .then(
                             if (isDefectsActive) Modifier.background(ContentLight, RoundedCornerShape(16.dp))
                             else Modifier

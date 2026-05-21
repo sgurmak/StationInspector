@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import com.example.stationinspector.ui.export.ExportScreen
+import com.example.stationinspector.ui.navigation.BottomNavBar
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  App-wide gradient tokens

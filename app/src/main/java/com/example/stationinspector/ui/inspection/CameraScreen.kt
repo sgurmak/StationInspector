@@ -10,7 +10,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -49,25 +48,12 @@ import coil.request.CachePolicy
 import coil.request.ImageRequest
 import com.example.stationinspector.domain.model.PhotoType
 import com.example.stationinspector.domain.model.PhotoZone
+import com.example.stationinspector.ui.navigation.ZONE_LIST
+import com.example.stationinspector.ui.navigation.ZoneMeta
+import com.example.stationinspector.ui.theme.clickableNoRipple
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Zone display metadata — exactly 3 Czech zones
-// ─────────────────────────────────────────────────────────────────────────────
-
-internal data class ZoneMeta(
-    val zone:  PhotoZone,
-    val label: String,
-    val icon:  ImageVector
-)
-
-internal val ZONE_LIST = listOf(
-    ZoneMeta(PhotoZone.ENTRANCE, "Nádraží", Icons.Filled.Train),
-    ZoneMeta(PhotoZone.PLATFORM, "Čekárna", Icons.Filled.AirlineSeatReclineExtra),
-    ZoneMeta(PhotoZone.RESTROOM, "WC",      Icons.Filled.Wc)
-)
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Design tokens
@@ -293,10 +279,7 @@ fun CameraScreen(
                                 .align(Alignment.TopEnd)
                                 .padding(4.dp)
                                 .size(24.dp)
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication        = null
-                                ) { viewModel.deletePhoto(lastPhoto.id) }
+                                .clickableNoRipple { viewModel.deletePhoto(lastPhoto.id) }
                         )
                     } else {
                         Icon(
@@ -372,11 +355,7 @@ private fun ZoneItem(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication        = null,
-                onClick           = onClick
-            )
+            .clickableNoRipple(onClick = onClick)
     ) {
         // ── Story 1: Pill ─────────────────────────────────────────────────────
         // Fixed dimensions guarantee all three zones are the same size,
@@ -474,11 +453,7 @@ private fun ShutterButton(
                 modifier = Modifier
                     .size(60.dp)
                     .border(2.5.dp, outerBorderColor, CircleShape)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication        = null,
-                        onClick           = onClick
-                    ),
+                    .clickableNoRipple(onClick = onClick),
                 contentAlignment = Alignment.Center
             ) {
                 // Inner filled circle (48dp)

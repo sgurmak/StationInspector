@@ -46,6 +46,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.stationinspector.ui.components.MapWidget
+import com.example.stationinspector.ui.theme.CardContent
+import com.example.stationinspector.ui.theme.ContentLight
 import java.time.LocalDate
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -65,11 +67,8 @@ private val DateCircleSel    = Color(0xFF261937)
 private val DateTextUnsel    = Color(0xFF261937)
 private val DateTextSel      = Color(0xFFFBF7FF)
 private val OverlayBg        = Color(0xFF271A39)  // Map info bar background
-internal val ContentLight    = Color(0xFFFBF7FF)  // Shared: text/icons on dark surfaces
 private val CardBg           = Color(0xFFFBF7FF)
-internal val CardContent     = Color(0xFF261937)  // Shared: text/icons on light card surfaces
 private val WarningRed       = Color(0xFFCA065E)
-internal val NavBarBg        = Color(0xFF13111B)
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Station List Screen — content only; Scaffold and gradient live in MainAppScreen
@@ -846,86 +845,4 @@ private fun EmptyStationState() {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Bottom Navigation Bar  (used by MainAppScreen)
-// ─────────────────────────────────────────────────────────────────────────────
 
-internal data class BottomNavItem(
-    val label: String,
-    val icon:  ImageVector
-)
-
-@Composable
-fun BottomNavBar(
-    selectedTab:   Int,
-    onTabSelected: (Int) -> Unit
-) {
-    val items = listOf(
-        BottomNavItem("Work",     Icons.Default.Home),
-        BottomNavItem("Map",      Icons.Default.Map),
-        BottomNavItem("Export",   Icons.Default.Share),
-        BottomNavItem("Settings", Icons.Default.Settings)
-    )
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(NavBarBg)
-    ) {
-        HorizontalDivider(
-            thickness = 0.5.dp,
-            color     = ContentLight.copy(alpha = 0.3f)
-        )
-
-        Row(
-            modifier              = Modifier
-                .fillMaxWidth()
-                .height(60.dp),
-            verticalAlignment     = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            items.forEachIndexed { index, item ->
-                val isSelected = index == selectedTab
-
-                // All tabs — including Export — simply switch the active tab.
-                val clickAction: () -> Unit = { onTabSelected(index) }
-
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .clickable(onClick = clickAction),
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = if (isSelected) {
-                            Modifier
-                                .width(50.dp)
-                                .height(26.dp)
-                                .background(ContentLight, RoundedCornerShape(12.dp))
-                        } else {
-                            Modifier.width(50.dp).height(26.dp)
-                        }
-                    ) {
-                        Icon(
-                            imageVector        = item.icon,
-                            contentDescription = item.label,
-                            tint               = if (isSelected) CardContent else ContentLight,
-                            modifier           = Modifier.size(20.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text       = item.label,
-                        fontSize   = 10.sp,
-                        fontWeight = FontWeight.Medium,
-                        color      = ContentLight,
-                        maxLines   = 1
-                    )
-                }
-            }
-        }
-    }
-}
