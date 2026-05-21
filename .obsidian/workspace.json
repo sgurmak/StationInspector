@@ -1,0 +1,188 @@
+{
+  "main": {
+    "id": "f6b449b16f04ec65",
+    "type": "split",
+    "children": [
+      {
+        "id": "362e81adf7cad62b",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "f7263605f42b63fb",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Claude.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Claude"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "e84a50478e7139e2",
+    "type": "split",
+    "children": [
+      {
+        "id": "f29d9c13292ede3b",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "06e30370c5fd6fd6",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Файловий менеджер"
+            }
+          },
+          {
+            "id": "c8113ae0b2685d68",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Пошук"
+            }
+          },
+          {
+            "id": "659e9874fc19aa47",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Закладки"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "898e24eb8e37b437",
+    "type": "split",
+    "children": [
+      {
+        "id": "deef98c5f5f5a039",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "cccf492b58aed10c",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "Claude.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Зворотні посилання для Claude"
+            }
+          },
+          {
+            "id": "75b7e82e5ef5edcb",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "Claude.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Вихідні посилання з Claude"
+            }
+          },
+          {
+            "id": "2a08bebd9a271420",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Мітки"
+            }
+          },
+          {
+            "id": "9f011f0646b8ec4e",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "Всі властивості"
+            }
+          },
+          {
+            "id": "5963201da00f9840",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "Claude.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Вміст Claude"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Відкрити провідник файлів": false,
+      "graph:Граф": false,
+      "canvas:Створити нове полотно": false,
+      "daily-notes:Сьогоднішня нотатка": false,
+      "templates:Вставити шаблон": false,
+      "command-palette:Відкрити меню команд": false,
+      "bases:Створити нову базу": false
+    }
+  },
+  "active": "f7263605f42b63fb",
+  "lastOpenFiles": []
+}

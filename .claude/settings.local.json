@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__obsidian-http__write_file",
+      "mcp__obsidian-http__list_files",
+      "mcp__obsidian-http__read_file",
+      "mcp__obsidian-http__edit_file"
+    ]
+  }
+}

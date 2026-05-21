@@ -1,0 +1,40 @@
+Index: app/src/main/java/com/example/stationinspector/ui/screens/StationListViewModel.kt
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/src/main/java/com/example/stationinspector/ui/screens/StationListViewModel.kt b/app/src/main/java/com/example/stationinspector/ui/screens/StationListViewModel.kt
+--- a/app/src/main/java/com/example/stationinspector/ui/screens/StationListViewModel.kt
++++ b/app/src/main/java/com/example/stationinspector/ui/screens/StationListViewModel.kt	(date 1777690136398)
+@@ -226,7 +226,7 @@
+     val uiEvent = _uiEvent.asSharedFlow()
+ 
+     fun optimizeRoute() {
+-        val activeItems = _routeItems.value.filter { !it.isHidden }
++        val activeItems = routeItems.value.filter { !it.isHidden }
+         val validItems = activeItems.filter { it.latitude != 0.0 && it.longitude != 0.0 }
+         
+         if (validItems.size < 3) {
+@@ -239,12 +239,18 @@
+         if (_isOptimizing.value) return
+         _isOptimizing.value = true
+ 
+-        viewModelScope.launch {
++        viewModelScope.launch(Dispatchers.IO) {
+             val result = routeRepository.optimizeAndFetchGeometry(validItems)
+             result.onSuccess { data ->
+-                val hiddenItems = _routeItems.value.filter { it.isHidden }
+-                _routeItems.value = data.reorderedItems + hiddenItems
+-                calculateDailyRoute(_routeItems.value)
++                val hiddenItems = routeItems.value.filter { it.isHidden }
++                val newOrder = data.reorderedItems + hiddenItems
++                newOrder.forEachIndexed { index, item ->
++                    if (item is StationItem) {
++                        stationDao.updateStationOrder(item.station.id.toLong(), index)
++                    } else if (item is PoiItem) {
++                        poiDao.updatePoiOrder(item.id, index)
++                    }
++                }
+             }.onFailure { e ->
+                 _uiEvent.emit(UiEvent.ShowSnackbar(e.message ?: "Optimization failed"))
+             }
