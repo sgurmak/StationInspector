@@ -4,7 +4,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -15,14 +14,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.composed
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.navigation.compose.hiltViewModel
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -52,92 +50,80 @@ fun SettingsScreen(
         uri?.let { viewModel.importStationsFromCsv(context, it) }
     }
 
+    SettingsScreenContent(
+        onNavigateBack = onNavigateBack,
+        onImportCsvClick = { csvLauncher.launch("*/*") },
+        onClearStorageClick = { viewModel.clearAllData() },
+        contentPadding = contentPadding
+    )
+}
+
+@Composable
+fun SettingsScreenContent(
+    onNavigateBack: () -> Unit,
+    onImportCsvClick: () -> Unit,
+    onClearStorageClick: () -> Unit,
+    contentPadding: PaddingValues = PaddingValues()
+) {
     // ── Clear-all dialog state ────────────────────────────────────────────────
     var showClearDialog by remember { mutableStateOf(false) }
 
-    // ── Custom confirmation dialog ─────────────────────────────────────────────
+    // ── Material 3 AlertDialog ─────────────────────────────────────────────
     if (showClearDialog) {
-        Dialog(onDismissRequest = { showClearDialog = false }) {
-            // ── Dialog container ──────────────────────────────────────────────
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        color = Color(0xFFFBF7FF),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                    .padding(vertical = 24.dp, horizontal = 16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Delete icon
+        AlertDialog(
+            onDismissRequest = { showClearDialog = false },
+            icon = {
                 Icon(
                     imageVector        = Icons.Filled.Delete,
                     contentDescription = null,
                     tint               = DestructiveAccent,
                     modifier           = Modifier.size(32.dp)
                 )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Title
+            },
+            title = {
                 Text(
                     text       = "Delete all data?",
                     fontSize   = 18.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color      = Color(0xFF261937),
-                    textAlign  = TextAlign.Center
+                    color      = Color(0xFF261937)
                 )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Message
+            },
+            text = {
                 Text(
                     text      = "All stations and photos will be deleted from the database. This action cannot be undone.",
                     fontSize  = 14.sp,
-                    color     = Color(0xFF261937),
-                    textAlign = TextAlign.Center,
-                    modifier  = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp)
+                    color     = Color(0xFF261937)
                 )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // ── Centred button row ────────────────────────────────────────
-                Row(
-                    modifier              = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(36.dp, Alignment.CenterHorizontally),
-                    verticalAlignment     = Alignment.CenterVertically
+            },
+            containerColor = Color(0xFFFBF7FF),
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onClearStorageClick()
+                        showClearDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = DestructiveAccent,
+                        contentColor   = Color(0xFFFBF7FF)
+                    )
                 ) {
-                    // Cancel
-                    OutlinedButton(
-                        onClick = { showClearDialog = false },
-                        border  = androidx.compose.foundation.BorderStroke(
-                            1.dp, Color(0xFF261937)
-                        )
-                    ) {
-                        Text(
-                            text  = "Cancel",
-                            color = Color(0xFF261937)
-                        )
-                    }
-
-                    // Delete
-                    Button(
-                        onClick = {
-                            viewModel.clearAllData()
-                            showClearDialog = false
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = DestructiveAccent,
-                            contentColor   = Color(0xFFFBF7FF)
-                        )
-                    ) {
-                        Text("Delete")
-                    }
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { showClearDialog = false },
+                    border  = androidx.compose.foundation.BorderStroke(
+                        1.dp, Color(0xFF261937)
+                    )
+                ) {
+                    Text(
+                        text  = "Cancel",
+                        color = Color(0xFF261937)
+                    )
                 }
             }
-        }
+        )
     }
 
     // ── Screen content ────────────────────────────────────────────────────────
@@ -187,9 +173,8 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     .height(56.dp)
                     .background(ButtonBg, RoundedCornerShape(12.dp))
-                    .then(
-                        Modifier.clickableNoRipple { csvLauncher.launch("*/*") }
-                    ),
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { onImportCsvClick() },
                 contentAlignment = Alignment.CenterStart
             ) {
                 Row(
@@ -220,9 +205,8 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     .height(56.dp)
                     .background(DestructiveBg, RoundedCornerShape(12.dp))
-                    .then(
-                        Modifier.clickableNoRipple { showClearDialog = true }
-                    ),
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { showClearDialog = true },
                 contentAlignment = Alignment.CenterStart
             ) {
                 Row(
@@ -250,14 +234,13 @@ fun SettingsScreen(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Helper: clickable without ripple (clean flat button feel)
-// ─────────────────────────────────────────────────────────────────────────────
-
-private fun Modifier.clickableNoRipple(onClick: () -> Unit): Modifier = composed {
-    this.clickable(
-        interactionSource = remember { MutableInteractionSource() },
-        indication = null,
-        onClick = onClick
+@Preview(showBackground = true, backgroundColor = 0xFF13111B)
+@Composable
+fun SettingsScreenContentPreview() {
+    SettingsScreenContent(
+        onNavigateBack = {},
+        onImportCsvClick = {},
+        onClearStorageClick = {}
     )
 }
+

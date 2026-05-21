@@ -1,5 +1,6 @@
 package com.example.stationinspector.ui.screens
 
+import androidx.compose.runtime.Immutable
 import android.content.Context
 import android.net.Uri
 import android.util.Log
@@ -103,6 +104,7 @@ data class StationWithCounts(
     val issueCount: Int
 )
 
+@Immutable
 data class DailyRouteInfo(
     val totalDistanceKm: Double,
     val totalTimeMins: Int,
@@ -112,6 +114,17 @@ data class DailyRouteInfo(
     val formattedDuration: String
         get() = if (totalTimeMins >= 60) "${totalTimeMins / 60}h ${totalTimeMins % 60}min" else "${totalTimeMins}min"
 }
+
+@Immutable
+data class ShortcutUiModel(
+    val id: String,
+    val label: String,
+    val customName: String?,
+    val poiItem: PoiItem?,
+    val isNew: Boolean,
+    val isRoundTrip: Boolean,
+    val entity: ShortcutEntity
+)
 
 sealed interface SearchUiState {
     data object Idle    : SearchUiState
@@ -155,7 +168,27 @@ class StationListViewModel @Inject constructor(
         }
     }
     
-    val shortcuts = shortcutDao.getAllShortcuts()
+    val shortcuts: StateFlow<List<ShortcutUiModel>> = shortcutDao.getAllShortcuts()
+        .map { entities ->
+            entities.map { entity ->
+                val poiItem = entity.poiItemJson?.let {
+                    try {
+                        gson.fromJson(it, PoiItem::class.java)
+                    } catch (e: Exception) {
+                        null
+                    }
+                }
+                ShortcutUiModel(
+                    id = entity.id,
+                    label = entity.label,
+                    customName = entity.customName,
+                    poiItem = poiItem,
+                    isNew = entity.isNew,
+                    isRoundTrip = entity.isRoundTrip,
+                    entity = entity
+                )
+            }
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // ── Selected date ──────────────────────────────────────────────────────────
