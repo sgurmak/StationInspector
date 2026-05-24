@@ -4,24 +4,22 @@ import androidx.compose.runtime.Immutable
 import android.content.Context
 import android.net.Uri
 import android.util.Log
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.booleanPreferencesKey
-import androidx.datastore.preferences.core.edit
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.stationinspector.data.local.dao.PoiDao
-import com.example.stationinspector.data.local.dao.ShortcutDao
 import com.example.stationinspector.data.local.dao.StationDao
-import com.example.stationinspector.data.local.entity.PoiEntity
 import com.example.stationinspector.data.local.entity.ShortcutEntity
 import com.example.stationinspector.data.repository.MapyCzRepository
+import com.example.stationinspector.domain.model.Poi
+import com.example.stationinspector.domain.model.PoiLocation
+import com.example.stationinspector.domain.model.Shortcut
 import com.example.stationinspector.domain.model.Station
 import com.example.stationinspector.domain.model.StationStatus
+import com.example.stationinspector.domain.repository.PoiRepository
+import com.example.stationinspector.domain.repository.PreferencesRepository
 import com.example.stationinspector.domain.repository.RouteRepository
+import com.example.stationinspector.domain.repository.ShortcutRepository
 import com.example.stationinspector.domain.repository.StationRepository
 import com.example.stationinspector.utils.PolylineUtils
-import com.google.gson.Gson
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -145,32 +143,25 @@ class StationListViewModel @Inject constructor(
     private val stationRepository: StationRepository,
     private val routeRepository: RouteRepository,
     private val mapyCzRepository: MapyCzRepository,
-    private val shortcutDao: ShortcutDao,
-    private val poiDao: PoiDao,
+    private val shortcutRepository: ShortcutRepository,
+    private val poiRepository: PoiRepository,
+    private val preferencesRepository: PreferencesRepository,
     private val stationDao: StationDao,
-    private val database: AppDatabase,
-    private val dataStore: DataStore<Preferences>
+    private val database: AppDatabase
 ) : ViewModel() {
-    private val gson = Gson()
-    
+
     companion object {
-        val HOME_ROUND_TRIP_ENABLED = booleanPreferencesKey("home_round_trip_enabled")
-        private const val SHORTCUT_ID_HOME = "1"
-        private const val SHORTCUT_ID_WORK = "2"
+        private const val SHORTCUT_ID_HOME = Shortcut.ID_HOME
+        private const val SHORTCUT_ID_WORK = Shortcut.ID_WORK
         private const val TAG = "StationListViewModel"
     }
 
-    val isRoundTripEnabled: StateFlow<Boolean> = dataStore.data
-        .map { preferences ->
-            preferences[HOME_ROUND_TRIP_ENABLED] ?: false
-        }
+    val isRoundTripEnabled: StateFlow<Boolean> = preferencesRepository.isRoundTripEnabled
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     fun setRoundTripEnabled(enabled: Boolean) {
         viewModelScope.launch {
-            dataStore.edit { preferences ->
-                preferences[HOME_ROUND_TRIP_ENABLED] = enabled
-            }
+            preferencesRepository.setRoundTripEnabled(enabled)
             val date = _selectedDate.value
             if (date != null) {
                 withContext(Dispatchers.IO) {
@@ -179,28 +170,9 @@ class StationListViewModel @Inject constructor(
             }
         }
     }
-    
-    val shortcuts: StateFlow<List<ShortcutUiModel>> = shortcutDao.getAllShortcuts()
-        .map { entities ->
-            entities.map { entity ->
-                val poiItem = entity.poiItemJson?.let {
-                    try {
-                        gson.fromJson(it, PoiItem::class.java)
-                    } catch (e: Exception) {
-                        null
-                    }
-                }
-                ShortcutUiModel(
-                    id = entity.id,
-                    label = entity.label,
-                    customName = entity.customName,
-                    poiItem = poiItem,
-                    isNew = entity.isNew,
-                    isRoundTrip = entity.isRoundTrip,
-                    entity = entity
-                )
-            }
-        }
+
+    val shortcuts: StateFlow<List<ShortcutUiModel>> = shortcutRepository.observeShortcuts()
+        .map { domainList -> domainList.map { it.toUiModel() } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // ── Selected date ──────────────────────────────────────────────────────────
@@ -231,7 +203,7 @@ class StationListViewModel @Inject constructor(
                 } else {
                     combine(
                         stationRepository.getAllStationsWithSplitCounts(),
-                        poiDao.getPoisForDate(date),
+                        poiRepository.observePoisForDate(date),
                         _hiddenIds
                     ) { allStations, pois, hiddenIds ->
                         val stationItems = allStations
@@ -251,18 +223,18 @@ class StationListViewModel @Inject constructor(
                                 )
                             }
 
-                        val poiItems = pois.map { entity ->
+                        val poiItems = pois.map { poi ->
                             PoiItem(
-                                id       = entity.id,
-                                uniqueId = entity.id,
-                                name     = entity.name,
-                                city     = entity.city,
-                                address  = entity.address,
-                                region   = entity.region,
-                                latitude = entity.latitude,
-                                longitude = entity.longitude,
-                                orderIndex = entity.orderIndex,
-                                isHidden   = hiddenIds.contains(entity.id)
+                                id       = poi.id,
+                                uniqueId = poi.id,
+                                name     = poi.name,
+                                city     = poi.city,
+                                address  = poi.address,
+                                region   = poi.region,
+                                latitude = poi.latitude,
+                                longitude = poi.longitude,
+                                orderIndex = poi.orderIndex,
+                                isHidden   = hiddenIds.contains(poi.id)
                             )
                         }
 
@@ -340,7 +312,7 @@ class StationListViewModel @Inject constructor(
                     }
 
                     stationDao.updateStationOrders(stationOrders)
-                    poiDao.updatePoiOrders(poiOrders)
+                    poiRepository.updateOrders(poiOrders)
                 }.onFailure { e ->
                     // API/network rejection — expected failure path.
                     Log.w(TAG, "Route optimization returned a failure result", e)
@@ -382,28 +354,33 @@ class StationListViewModel @Inject constructor(
                 if (poi is StationItem) {
                     stationRepository.updateStationCoordinates(poi.id.toLong(), lat, lon)
                 } else if (poi is PoiItem) {
-                    val currentShortcuts = shortcutDao.getAllShortcuts().first()
+                    // Propagate the new coordinates to any shortcut that points
+                    // at this POI so the saved Home/Work pin moves too.
+                    val currentShortcuts = shortcutRepository.observeShortcuts().first()
                     currentShortcuts.forEach { shortcut ->
-                        if (shortcut.poiItemJson != null) {
-                            val parsed = gson.fromJson(shortcut.poiItemJson, PoiItem::class.java)
-                            if (parsed.id == poi.id) {
-                                val updatedJson = gson.toJson(parsed.copy(latitude = lat, longitude = lon))
-                                shortcutDao.updateShortcut(shortcut.id, updatedJson, shortcut.customName, shortcut.isNew)
-                            }
+                        val location = shortcut.location
+                        if (location != null && location.id == poi.id) {
+                            shortcutRepository.updateShortcut(
+                                id = shortcut.id,
+                                location = location.copy(latitude = lat, longitude = lon),
+                                customName = shortcut.customName,
+                                isNew = shortcut.isNew
+                            )
                         }
                     }
-                    val entity = PoiEntity(
-                        id             = poi.id,
-                        name           = poi.name,
-                        city           = poi.city,
-                        address        = poi.address,
-                        region         = poi.region,
-                        latitude       = lat,
-                        longitude      = lon,
-                        inspectionDate = date,
-                        orderIndex     = poi.orderIndex
+                    poiRepository.insertPoi(
+                        Poi(
+                            id             = poi.id,
+                            name           = poi.name,
+                            city           = poi.city,
+                            address        = poi.address,
+                            region         = poi.region,
+                            latitude       = lat,
+                            longitude      = lon,
+                            inspectionDate = date,
+                            orderIndex     = poi.orderIndex
+                        )
                     )
-                    poiDao.insertPoi(entity)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to save edited coordinates for '${poi.name}'", e)
@@ -471,33 +448,15 @@ class StationListViewModel @Inject constructor(
         val isRoundTrip = isRoundTripEnabled.value
         if (isRoundTrip && lastItem != null && lastItem.name == "Home" && lastItem is PoiItem) {
             val targetOrderIndex = lastItem.orderIndex
-            val newPoiEntity = PoiEntity(
-                id = java.util.UUID.randomUUID().toString(),
-                name = poi.name,
-                city = poi.city,
-                address = poi.address,
-                region = poi.region,
-                latitude = poi.latitude,
-                longitude = poi.longitude,
-                inspectionDate = date,
-                orderIndex = targetOrderIndex
+            poiRepository.insertPoi(
+                poi.toDomainAt(date = date, orderIndex = targetOrderIndex, freshId = true)
             )
-            poiDao.insertPoi(newPoiEntity)
-            poiDao.updatePoiOrder(lastItem.id, targetOrderIndex + 1)
+            poiRepository.updateOrder(lastItem.id, targetOrderIndex + 1)
         } else {
             val maxOrder = currentItems.maxOfOrNull { it.orderIndex } ?: -1
-            val newPoiEntity = PoiEntity(
-                id = java.util.UUID.randomUUID().toString(),
-                name = poi.name,
-                city = poi.city,
-                address = poi.address,
-                region = poi.region,
-                latitude = poi.latitude,
-                longitude = poi.longitude,
-                inspectionDate = date,
-                orderIndex = maxOrder + 1
+            poiRepository.insertPoi(
+                poi.toDomainAt(date = date, orderIndex = maxOrder + 1, freshId = true)
             )
-            poiDao.insertPoi(newPoiEntity)
         }
     }
 
@@ -509,8 +468,8 @@ class StationListViewModel @Inject constructor(
     ) {
         database.withTransaction {
             val stations = stationDao.getAllStationsSync().filter { it.inspectionDate == date }
-            val pois = poiDao.getPoisForDateSync(date)
-            
+            val pois = poiRepository.getPoisForDate(date)
+
             val existingHome = if (clearHome) null else pois.firstOrNull { it.name == "Home" }
             val homePoi = newHomePoi ?: existingHome?.let {
                 PoiItem(
@@ -523,8 +482,8 @@ class StationListViewModel @Inject constructor(
                     longitude = it.longitude
                 )
             }
-            
-            poiDao.deletePoisByNameAndDate("Home", date)
+
+            poiRepository.deletePoisByNameAndDate("Home", date)
             
             if (homePoi != null) {
                 val nonHomePois = pois.filter { it.name != "Home" }
@@ -553,7 +512,7 @@ class StationListViewModel @Inject constructor(
                     )
                 }).sortedBy { it.orderIndex }
                 
-                val startEntity = PoiEntity(
+                val startPoi = Poi(
                     id = homePoi.id.takeIf { it.isNotBlank() && it != "NEW" } ?: java.util.UUID.randomUUID().toString(),
                     name = "Home",
                     city = homePoi.city,
@@ -564,18 +523,18 @@ class StationListViewModel @Inject constructor(
                     inspectionDate = date,
                     orderIndex = 0
                 )
-                poiDao.insertPoi(startEntity)
-                
+                poiRepository.insertPoi(startPoi)
+
                 nonHomeItems.forEachIndexed { idx, item ->
                     val newIdx = idx + 1
                     when (item) {
                         is StationItem -> stationDao.updateStationOrder(item.station.id.toLong(), newIdx)
-                        is PoiItem -> poiDao.updatePoiOrder(item.id, newIdx)
+                        is PoiItem -> poiRepository.updateOrder(item.id, newIdx)
                     }
                 }
-                
+
                 if (isRoundTrip) {
-                    val endEntity = PoiEntity(
+                    val endPoi = Poi(
                         id = java.util.UUID.randomUUID().toString(),
                         name = "Home",
                         city = homePoi.city,
@@ -586,7 +545,7 @@ class StationListViewModel @Inject constructor(
                         inspectionDate = date,
                         orderIndex = nonHomeItems.size + 1
                     )
-                    poiDao.insertPoi(endEntity)
+                    poiRepository.insertPoi(endPoi)
                 }
             } else {
                 val remainingPois = pois.filter { it.name != "Home" }
@@ -618,7 +577,7 @@ class StationListViewModel @Inject constructor(
                 remainingItems.forEachIndexed { idx, item ->
                     when (item) {
                         is StationItem -> stationDao.updateStationOrder(item.station.id.toLong(), idx)
-                        is PoiItem -> poiDao.updatePoiOrder(item.id, idx)
+                        is PoiItem -> poiRepository.updateOrder(item.id, idx)
                     }
                 }
             }
@@ -664,7 +623,7 @@ class StationListViewModel @Inject constructor(
                 }
                 
                 if (stationOrders.isNotEmpty()) stationDao.updateStationOrders(stationOrders)
-                if (poiOrders.isNotEmpty())     poiDao.updatePoiOrders(poiOrders)
+                if (poiOrders.isNotEmpty())     poiRepository.updateOrders(poiOrders)
             }
         }
     }
@@ -676,12 +635,12 @@ class StationListViewModel @Inject constructor(
     fun deletePoi(id: String) {
         val date = _selectedDate.value ?: return
         viewModelScope.launch(Dispatchers.IO) {
-            val pois = poiDao.getPoisForDateSync(date)
+            val pois = poiRepository.getPoisForDate(date)
             val poiToDelete = pois.firstOrNull { it.id == id }
             if (poiToDelete != null && poiToDelete.name == "Home") {
                 rebuildHomePointsAndIndices(date, false, null, clearHome = true)
             } else {
-                poiDao.deletePoi(id)
+                poiRepository.deletePoi(id)
                 rebuildHomePointsAndIndices(date, isRoundTripEnabled.value)
             }
         }
@@ -689,28 +648,28 @@ class StationListViewModel @Inject constructor(
 
     fun updateShortcut(id: String, poi: PoiItem?, customName: String?) {
         viewModelScope.launch(Dispatchers.IO) {
-            val isNew = poi == null
-            val json = poi?.let { gson.toJson(it) }
-            shortcutDao.updateShortcut(id, json, customName, isNew)
+            shortcutRepository.updateShortcut(
+                id = id,
+                location = poi?.toPoiLocation(),
+                customName = customName,
+                isNew = poi == null
+            )
         }
     }
 
     fun createNewShortcut(poi: PoiItem?, customName: String?) {
         viewModelScope.launch(Dispatchers.IO) {
-            val id = java.util.UUID.randomUUID().toString()
-            val isNew = poi == null
-            val json = poi?.let { gson.toJson(it) }
-            shortcutDao.insertShortcut(ShortcutEntity(id, "Preset", customName, json, isNew))
+            shortcutRepository.insertPreset(poi?.toPoiLocation(), customName)
         }
     }
 
     fun deleteShortcut(id: String) {
         viewModelScope.launch(Dispatchers.IO) {
             if (id == SHORTCUT_ID_HOME || id == SHORTCUT_ID_WORK) {
-                // Keep Home and Work but clear them
-                shortcutDao.updateShortcut(id, null, null, true)
+                // Keep Home and Work entries — just clear their bound location.
+                shortcutRepository.updateShortcut(id, location = null, customName = null, isNew = true)
             } else {
-                shortcutDao.deleteShortcut(id)
+                shortcutRepository.deleteShortcut(id)
             }
         }
     }
@@ -750,13 +709,8 @@ class StationListViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
-                shortcutDao.clearOldBlankShortcuts()
-                if (shortcutDao.getShortcutCount() == 0) {
-                    shortcutDao.insertShortcuts(listOf(
-                        ShortcutEntity(SHORTCUT_ID_HOME, "Home", null, null, true),
-                        ShortcutEntity(SHORTCUT_ID_WORK, "Work", null, null, true)
-                    ))
-                }
+                shortcutRepository.clearOldBlankShortcuts()
+                shortcutRepository.ensureDefaults()
                 stationRepository.seedCoordinatesIfMissing()
             }
             // Uses the JOIN query so photo/issue counts stay in sync with
@@ -980,3 +934,61 @@ class StationListViewModel @Inject constructor(
         }
     }
 }
+
+// ── UI ↔ domain mappers (private to this file) ─────────────────────────────────
+
+private fun Shortcut.toUiModel(): ShortcutUiModel = ShortcutUiModel(
+    id          = id,
+    label       = label,
+    customName  = customName,
+    poiItem     = location?.toPoiItem(),
+    isNew       = isNew,
+    isRoundTrip = isRoundTrip,
+    // Synthesized for source compatibility with existing previews.
+    // The `entity` field on ShortcutUiModel is no longer the canonical
+    // source — repository is. Slated for removal in a later UI cleanup.
+    entity      = ShortcutEntity(
+        id          = id,
+        label       = label,
+        customName  = customName,
+        poiItemJson = null,
+        isNew       = isNew,
+        isRoundTrip = isRoundTrip
+    )
+)
+
+private fun PoiLocation.toPoiItem(): PoiItem = PoiItem(
+    id        = id,
+    name      = name,
+    city      = city,
+    address   = address,
+    region    = region,
+    latitude  = latitude,
+    longitude = longitude
+)
+
+private fun PoiItem.toPoiLocation(): PoiLocation = PoiLocation(
+    id        = id,
+    name      = name,
+    city      = city,
+    address   = address,
+    region    = region,
+    latitude  = latitude,
+    longitude = longitude
+)
+
+/**
+ * Build a [Poi] domain object from a [PoiItem] for a given date/order, optionally
+ * forcing a fresh UUID when a new POI row is being inserted into the route.
+ */
+private fun PoiItem.toDomainAt(date: LocalDate, orderIndex: Int, freshId: Boolean): Poi = Poi(
+    id             = if (freshId) java.util.UUID.randomUUID().toString() else id,
+    name           = name,
+    city           = city,
+    address        = address,
+    region         = region,
+    latitude       = latitude,
+    longitude      = longitude,
+    inspectionDate = date,
+    orderIndex     = orderIndex
+)

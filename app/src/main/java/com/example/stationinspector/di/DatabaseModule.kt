@@ -10,10 +10,17 @@ import com.example.stationinspector.data.local.dao.RouteCacheDao
 import com.example.stationinspector.data.local.dao.PoiDao
 import com.example.stationinspector.data.local.dao.ShortcutDao
 import com.example.stationinspector.data.remote.OrsApiService
+import com.example.stationinspector.data.repository.PoiRepositoryImpl
+import com.example.stationinspector.data.repository.PreferencesRepositoryImpl
 import com.example.stationinspector.data.repository.RouteRepositoryImpl
+import com.example.stationinspector.data.repository.ShortcutRepositoryImpl
 import com.example.stationinspector.data.repository.StationRepositoryImpl
+import com.example.stationinspector.domain.repository.PoiRepository
+import com.example.stationinspector.domain.repository.PreferencesRepository
 import com.example.stationinspector.domain.repository.RouteRepository
+import com.example.stationinspector.domain.repository.ShortcutRepository
 import com.example.stationinspector.domain.repository.StationRepository
+import com.google.gson.Gson
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -98,4 +105,28 @@ object DatabaseModule {
     fun provideDataStore(@ApplicationContext context: Context): DataStore<Preferences> {
         return context.dataStore
     }
+
+    // ── Singletons added by Step 5 (Repository layer for DAO/DataStore) ───
+
+    @Provides
+    @Singleton
+    fun provideGson(): Gson = Gson()
+
+    @Provides
+    @Singleton
+    fun provideShortcutRepository(
+        shortcutDao: ShortcutDao,
+        gson: Gson
+    ): ShortcutRepository = ShortcutRepositoryImpl(shortcutDao, gson)
+
+    @Provides
+    @Singleton
+    fun providePoiRepository(poiDao: PoiDao): PoiRepository =
+        PoiRepositoryImpl(poiDao)
+
+    @Provides
+    @Singleton
+    fun providePreferencesRepository(
+        dataStore: DataStore<Preferences>
+    ): PreferencesRepository = PreferencesRepositoryImpl(dataStore)
 }
