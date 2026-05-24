@@ -3,7 +3,6 @@ package com.example.stationinspector.ui.inspection
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -12,17 +11,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AddAPhoto
-import androidx.compose.material.icons.filled.AirlineSeatReclineExtra
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Train
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.filled.Wc
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,6 +49,8 @@ import com.example.stationinspector.domain.model.PhotoType
 import com.example.stationinspector.domain.model.PhotoZone
 import com.example.stationinspector.ui.navigation.ZONE_LIST
 import com.example.stationinspector.ui.navigation.ZoneMeta
+import com.example.stationinspector.ui.theme.AccentPink
+import com.example.stationinspector.ui.theme.AccentGreenM3
 import com.example.stationinspector.ui.theme.AppGradientTop
 import com.example.stationinspector.ui.theme.AppGradientBottom
 import com.example.stationinspector.ui.theme.ContentLight
@@ -59,14 +58,11 @@ import com.example.stationinspector.ui.theme.ContentDark
 import com.example.stationinspector.ui.theme.clickableNoRipple
 import java.io.File
 
-private val AccentRed         = Color(0xFFCA065E)
-private val AccentGreen       = Color(0xFF47DC7A)
-
 @Composable
 fun GalleryScreen(
     viewModel: ZoneInspectionViewModel = hiltViewModel(),
     onNavigateBack: () -> Unit,
-    onAddPhotoClick: () -> Unit,
+    onAddPhotoClick: (PhotoZone) -> Unit,
     onConfirmInspection: () -> Unit
 ) {
     val stationName by viewModel.stationName.collectAsState()
@@ -74,8 +70,8 @@ fun GalleryScreen(
     val photos by viewModel.photos.collectAsState()
     val selectedZone by viewModel.selectedZone.collectAsState()
 
-    var currentMode by remember { mutableStateOf(PhotoType.CLIENT_REPORT) }
-    var showSuccessBanner by remember { mutableStateOf(false) }
+    var currentMode by rememberSaveable { mutableStateOf(PhotoType.CLIENT_REPORT) }
+    var showSuccessBanner by rememberSaveable { mutableStateOf(false) }
     
     // Derived filtered photos for current zone & current mode
     val gridPhotos = photos.filter { it.type == currentMode }
@@ -133,7 +129,7 @@ fun GalleryScreen(
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
-                        .clickableNoRipple(onClick = onAddPhotoClick)
+                        .clickableNoRipple(onClick = { onAddPhotoClick(selectedZone) })
                         .padding(horizontal = 8.dp)
                 ) {
                     Icon(
@@ -210,32 +206,37 @@ fun GalleryScreen(
                                 imageVector = Icons.Default.Image,
                                 contentDescription = null,
                                 tint = if (isActive) ContentDark else ContentLight,
-                                modifier = Modifier.size(14.dp)
+                                modifier = Modifier.size(12.dp)
                             )
-                            Spacer(Modifier.width(4.dp))
+                            Spacer(modifier = Modifier.width(2.dp))
                             Text(
                                 text = ordCount.toString(),
-                                fontSize = 14.sp,
+                                fontSize = 12.sp,
+                                maxLines = 1,
+                                softWrap = false,
                                 color = if (isActive) ContentDark else ContentLight
                             )
                             
                             Text(
-                                text = "  |  ",
-                                fontSize = 14.sp,
+                                text = "|",
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(horizontal = 4.dp),
                                 color = if (isActive) ContentDark.copy(alpha = 0.5f) else ContentLight.copy(alpha = 0.5f)
                             )
 
                             Icon(
                                 imageVector = Icons.Default.Warning,
                                 contentDescription = null,
-                                tint = AccentRed,
-                                modifier = Modifier.size(14.dp)
+                                tint = AccentPink,
+                                modifier = Modifier.size(12.dp)
                             )
-                            Spacer(Modifier.width(4.dp))
+                            Spacer(modifier = Modifier.width(2.dp))
                             Text(
                                 text = defCount.toString(),
-                                fontSize = 14.sp,
-                                color = AccentRed
+                                fontSize = 12.sp,
+                                maxLines = 1,
+                                softWrap = false,
+                                color = AccentPink
                             )
                         }
                     }
@@ -293,7 +294,7 @@ fun GalleryScreen(
                         fontSize = 16.sp,
                         fontWeight = FontWeight.SemiBold,
                         fontFamily = FontFamily.Default,
-                        color = AccentRed
+                        color = AccentPink
                     )
                 }
             }
@@ -331,7 +332,7 @@ fun GalleryScreen(
                         Icon(
                             imageVector = Icons.Filled.Delete,
                             contentDescription = "Delete",
-                            tint = AccentRed,
+                            tint = AccentPink,
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
                                 .padding(4.dp)
@@ -368,7 +369,7 @@ fun GalleryScreen(
                 Icon(
                     imageVector = Icons.Filled.CheckCircle,
                     contentDescription = null,
-                    tint = AccentGreen,
+                    tint = AccentGreenM3,
                     modifier = Modifier.size(26.dp)
                 )
                 Spacer(Modifier.width(8.dp))
@@ -377,7 +378,7 @@ fun GalleryScreen(
                     fontSize = 18.sp,
                     fontWeight = FontWeight.SemiBold,
                     fontFamily = FontFamily.Default,
-                    color = AccentGreen
+                    color = AccentGreenM3
                 )
             }
         }
@@ -402,7 +403,7 @@ fun GalleryScreen(
                 Icon(
                     imageVector = Icons.Filled.CheckCircle,
                     contentDescription = "Success",
-                    tint = AccentGreen,
+                    tint = AccentGreenM3,
                     modifier = Modifier.size(24.dp)
                 )
                 Spacer(Modifier.width(12.dp))

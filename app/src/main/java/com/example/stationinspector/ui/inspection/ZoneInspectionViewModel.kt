@@ -48,14 +48,23 @@ class ZoneInspectionViewModel @Inject constructor(
     val currentStationId: Long =
         savedStateHandle.get<String>("stationId")?.toLongOrNull() ?: -1L
 
+    // Get the initial zone from route arguments, defaulting to ENTRANCE
+    private val initialZone: PhotoZone = savedStateHandle.get<String>("zoneName")?.let { zoneStr ->
+        try {
+            PhotoZone.valueOf(zoneStr)
+        } catch (e: IllegalArgumentException) {
+            PhotoZone.ENTRANCE
+        }
+    } ?: PhotoZone.ENTRANCE
+
     // ── Station name (loaded once for display in the top bar) ─────────────────
     val stationName: StateFlow<String> =
         stationRepository.getStationById(currentStationId)
             .map { station -> station?.name ?: "" }
             .stateIn(viewModelScope, SharingStarted.Eagerly, "")
 
-    // ── Selectable zone (UI-driven, defaults to ENTRANCE) ────────────────────
-    private val _selectedZone = MutableStateFlow(PhotoZone.ENTRANCE)
+    // ── Selectable zone (UI-driven, defaults to initialZone) ────────────────────
+    private val _selectedZone = MutableStateFlow(initialZone)
     val selectedZone: StateFlow<PhotoZone> = _selectedZone
 
     fun selectZone(zone: PhotoZone) { _selectedZone.value = zone }
@@ -97,6 +106,10 @@ class ZoneInspectionViewModel @Inject constructor(
         viewModelScope.launch {
             cameraXController.startCamera(lifecycleOwner, surfaceProvider)
         }
+    }
+
+    fun stopCamera() {
+        cameraXController.stopCamera()
     }
 
     fun onZoomChange(zoomChange: Float) {

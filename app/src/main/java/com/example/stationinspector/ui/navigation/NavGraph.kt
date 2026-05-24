@@ -9,6 +9,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -21,6 +22,12 @@ import com.example.stationinspector.ui.export.ExportScreen
 import com.example.stationinspector.ui.screens.MainAppScreen
 import com.example.stationinspector.ui.inspection.CameraScreen
 import com.example.stationinspector.ui.inspection.GalleryScreen
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import com.example.stationinspector.ui.screens.SplashScreen
 import com.example.stationinspector.domain.model.PhotoZone
 
 @Composable
@@ -56,24 +63,35 @@ fun StationInspectorNavGraph(
                 }
             }
 
-            MainAppScreen(
-                onStationClick = { stationId, totalPhotos ->
-                    if (totalPhotos > 0) {
-                        navController.navigate("gallery/$stationId/${PhotoZone.ENTRANCE.name}")
-                    } else {
-                        navController.navigate("camera/$stationId/${PhotoZone.ENTRANCE.name}")
+            // Manage cold-start splash state. Preloads MapWidget silently underneath.
+            var showSplash by rememberSaveable { mutableStateOf(true) }
+
+            Box(modifier = Modifier.fillMaxSize()) {
+                MainAppScreen(
+                    onStationClick = { stationId, totalPhotos ->
+                        if (totalPhotos > 0) {
+                            navController.navigate("gallery/$stationId/${PhotoZone.ENTRANCE.name}")
+                        } else {
+                            navController.navigate("camera/$stationId/${PhotoZone.ENTRANCE.name}")
+                        }
+                    },
+                    onNavigateToPoi = { lat, lon, name ->
+                        val uri       = Uri.parse("geo:$lat,$lon?q=${Uri.encode(name)}")
+                        val mapIntent = Intent(Intent.ACTION_VIEW, uri)
+                        try {
+                            context.startActivity(mapIntent)
+                        } catch (e: ActivityNotFoundException) {
+                            Toast.makeText(context, "Navigation app not found", Toast.LENGTH_SHORT).show()
+                        }
                     }
-                },
-                onNavigateToPoi = { lat, lon, name ->
-                    val uri       = Uri.parse("geo:$lat,$lon?q=${Uri.encode(name)}")
-                    val mapIntent = Intent(Intent.ACTION_VIEW, uri)
-                    try {
-                        context.startActivity(mapIntent)
-                    } catch (e: ActivityNotFoundException) {
-                        Toast.makeText(context, "Navigation app not found", Toast.LENGTH_SHORT).show()
-                    }
+                )
+
+                if (showSplash) {
+                    SplashScreen(
+                        onSplashComplete = { showSplash = false }
+                    )
                 }
-            )
+            }
         }
 
 
@@ -88,8 +106,8 @@ fun StationInspectorNavGraph(
             val stationId = it.arguments?.getString("stationId") ?: ""
             val zoneName  = it.arguments?.getString("zoneName")  ?: ""
             CameraScreen(
-                onNavigateToGallery = {
-                    navController.navigate("gallery/$stationId/$zoneName") {
+                onNavigateToGallery = { activeZone ->
+                    navController.navigate("gallery/$stationId/${activeZone.name}") {
                         popUpTo("camera/$stationId/$zoneName") { inclusive = true }
                     }
                 }
@@ -112,8 +130,8 @@ fun StationInspectorNavGraph(
                     navController.popBackStack()
                 },
                 // "Додати фото" → open CameraScreen for this zone
-                onAddPhotoClick = {
-                    navController.navigate("camera/$stationId/$zoneName") {
+                onAddPhotoClick = { activeZone ->
+                    navController.navigate("camera/$stationId/${activeZone.name}") {
                         popUpTo("gallery/$stationId/$zoneName") { inclusive = true }
                     }
                 },

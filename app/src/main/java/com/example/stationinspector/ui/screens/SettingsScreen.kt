@@ -15,13 +15,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.stationinspector.ui.theme.AccentPink
+import com.example.stationinspector.ui.theme.CardContent
+import com.example.stationinspector.ui.theme.ContentLight
+import com.example.stationinspector.ui.theme.DestructiveBg as DestructiveBgToken
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Settings Screen
@@ -29,11 +32,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Design tokens local to this screen
-private val SettingsText     = Color(0xFFFBF7FF)
-private val ButtonBg         = Color(0xFFFBF7FF)   // Import CSV button bg
-private val ButtonContent    = Color(0xFF261937)   // Import CSV icon + text
-private val DestructiveBg    = Color(0xFFFFD3EB)   // Clear DB button bg
-private val DestructiveAccent = Color(0xFFCA065E)  // Clear DB icon + text
+private val SettingsText      = ContentLight
+private val ButtonBg          = ContentLight        // Import CSV button bg
+private val ButtonContent     = CardContent         // Import CSV icon + text
+private val DestructiveBg     = DestructiveBgToken  // Clear DB button bg (pale pink)
+private val DestructiveAccent = AccentPink          // Clear DB icon + text
 
 @Composable
 fun SettingsScreen(
@@ -85,17 +88,17 @@ fun SettingsScreenContent(
                     text       = "Delete all data?",
                     fontSize   = 18.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color      = Color(0xFF261937)
+                    color      = ButtonContent
                 )
             },
             text = {
                 Text(
                     text      = "All stations and photos will be deleted from the database. This action cannot be undone.",
                     fontSize  = 14.sp,
-                    color     = Color(0xFF261937)
+                    color     = ButtonContent
                 )
             },
-            containerColor = Color(0xFFFBF7FF),
+            containerColor = ButtonBg,
             confirmButton = {
                 Button(
                     onClick = {
@@ -104,7 +107,7 @@ fun SettingsScreenContent(
                     },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = DestructiveAccent,
-                        contentColor   = Color(0xFFFBF7FF)
+                        contentColor   = ButtonBg
                     )
                 ) {
                     Text("Delete")
@@ -114,12 +117,12 @@ fun SettingsScreenContent(
                 OutlinedButton(
                     onClick = { showClearDialog = false },
                     border  = androidx.compose.foundation.BorderStroke(
-                        1.dp, Color(0xFF261937)
+                        1.dp, CardContent
                     )
                 ) {
                     Text(
                         text  = "Cancel",
-                        color = Color(0xFF261937)
+                        color = CardContent
                     )
                 }
             }

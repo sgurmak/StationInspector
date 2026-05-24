@@ -41,8 +41,11 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
 import org.osmdroid.util.GeoPoint
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -50,6 +53,8 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 import javax.inject.Inject
+import com.example.stationinspector.data.local.AppDatabase
+import androidx.room.withTransaction
 
 // ── UI model ───────────────────────────────────────────────────────────────────
 
@@ -143,6 +148,7 @@ class StationListViewModel @Inject constructor(
     private val shortcutDao: ShortcutDao,
     private val poiDao: PoiDao,
     private val stationDao: StationDao,
+    private val database: AppDatabase,
     private val dataStore: DataStore<Preferences>
 ) : ViewModel() {
     private val gson = Gson()
@@ -164,6 +170,12 @@ class StationListViewModel @Inject constructor(
         viewModelScope.launch {
             dataStore.edit { preferences ->
                 preferences[HOME_ROUND_TRIP_ENABLED] = enabled
+            }
+            val date = _selectedDate.value
+            if (date != null) {
+                withContext(Dispatchers.IO) {
+                    rebuildHomePointsAndIndices(date, enabled)
+                }
             }
         }
     }
@@ -426,9 +438,55 @@ class StationListViewModel @Inject constructor(
     fun addPoiToRoute(poi: PoiItem) {
         val date = _selectedDate.value ?: return
         viewModelScope.launch(Dispatchers.IO) {
-            val currentItems = routeItems.value
+            database.withTransaction {
+                insertPoiAtCorrectOrderIndex(poi, date)
+            }
+        }
+        _searchQuery.value = ""
+    }
+
+    fun addShortcutToRoute(shortcutId: String, poi: PoiItem) {
+        val date = _selectedDate.value ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            val finalPoi = when (shortcutId) {
+                SHORTCUT_ID_HOME -> poi.copy(name = "Home")
+                SHORTCUT_ID_WORK -> poi.copy(name = "Work")
+                else             -> poi
+            }
+
+            if (shortcutId == SHORTCUT_ID_HOME) {
+                rebuildHomePointsAndIndices(date, isRoundTripEnabled.value, finalPoi)
+            } else {
+                database.withTransaction {
+                    insertPoiAtCorrectOrderIndex(finalPoi, date)
+                }
+            }
+        }
+        _searchQuery.value = ""
+    }
+
+    private suspend fun insertPoiAtCorrectOrderIndex(poi: PoiItem, date: LocalDate) {
+        val currentItems = routeItems.value
+        val lastItem = currentItems.lastOrNull()
+        val isRoundTrip = isRoundTripEnabled.value
+        if (isRoundTrip && lastItem != null && lastItem.name == "Home" && lastItem is PoiItem) {
+            val targetOrderIndex = lastItem.orderIndex
+            val newPoiEntity = PoiEntity(
+                id = java.util.UUID.randomUUID().toString(),
+                name = poi.name,
+                city = poi.city,
+                address = poi.address,
+                region = poi.region,
+                latitude = poi.latitude,
+                longitude = poi.longitude,
+                inspectionDate = date,
+                orderIndex = targetOrderIndex
+            )
+            poiDao.insertPoi(newPoiEntity)
+            poiDao.updatePoiOrder(lastItem.id, targetOrderIndex + 1)
+        } else {
             val maxOrder = currentItems.maxOfOrNull { it.orderIndex } ?: -1
-            val poiEntity = PoiEntity(
+            val newPoiEntity = PoiEntity(
                 id = java.util.UUID.randomUUID().toString(),
                 name = poi.name,
                 city = poi.city,
@@ -439,77 +497,132 @@ class StationListViewModel @Inject constructor(
                 inspectionDate = date,
                 orderIndex = maxOrder + 1
             )
-            poiDao.insertPoi(poiEntity)
+            poiDao.insertPoi(newPoiEntity)
         }
-        _searchQuery.value = ""
     }
 
-    fun addShortcutToRoute(shortcutId: String, poi: PoiItem) {
-        val date = _selectedDate.value ?: return
-        viewModelScope.launch(Dispatchers.IO) {
-            // Apply the canonical display name for the two fixed shortcuts.
-            val finalPoi = when (shortcutId) {
-                SHORTCUT_ID_HOME -> poi.copy(name = "Home")
-                SHORTCUT_ID_WORK -> poi.copy(name = "Work")
-                else             -> poi
+    private suspend fun rebuildHomePointsAndIndices(
+        date: LocalDate,
+        isRoundTrip: Boolean,
+        newHomePoi: PoiItem? = null,
+        clearHome: Boolean = false
+    ) {
+        database.withTransaction {
+            val stations = stationDao.getAllStationsSync().filter { it.inspectionDate == date }
+            val pois = poiDao.getPoisForDateSync(date)
+            
+            val existingHome = if (clearHome) null else pois.firstOrNull { it.name == "Home" }
+            val homePoi = newHomePoi ?: existingHome?.let {
+                PoiItem(
+                    id = it.id,
+                    name = it.name,
+                    city = it.city,
+                    address = it.address,
+                    region = it.region,
+                    latitude = it.latitude,
+                    longitude = it.longitude
+                )
             }
-
-            val currentItems = routeItems.value
-            val maxOrder = currentItems.maxOfOrNull { it.orderIndex } ?: -1
-
-            if (shortcutId == SHORTCUT_ID_HOME) {
-                val newList = currentItems.toMutableList()
-                val isRoundTrip = isRoundTripEnabled.value
-                val startPoiItem = finalPoi.copy(id = java.util.UUID.randomUUID().toString())
-                newList.add(0, startPoiItem)
-                var endPoiItem: PoiItem? = null
-                if (isRoundTrip) {
-                    endPoiItem = finalPoi.copy(id = java.util.UUID.randomUUID().toString())
-                    newList.add(endPoiItem)
-                }
-
-                val stationOrders = mutableListOf<Pair<Long, Int>>()
-                val poiOrders = mutableListOf<Pair<String, Int>>()
-
-                newList.forEachIndexed { index, item ->
-                    if (item === startPoiItem || item === endPoiItem) {
-                        val e = PoiEntity(
-                            id = item.id,
-                            name = item.name,
-                            city = (item as PoiItem).city,
-                            address = item.address,
-                            region = item.region,
-                            latitude = item.latitude,
-                            longitude = item.longitude,
-                            inspectionDate = date,
-                            orderIndex = index
-                        )
-                        poiDao.insertPoi(e)
-                    } else if (item is StationItem) {
-                        stationOrders.add(item.station.id.toLong() to index)
-                    } else if (item is PoiItem) {
-                        poiOrders.add(item.id to index)
+            
+            poiDao.deletePoisByNameAndDate("Home", date)
+            
+            if (homePoi != null) {
+                val nonHomePois = pois.filter { it.name != "Home" }
+                val nonHomeItems = (stations.map {
+                    StationItem(
+                        station = StationWithCounts(
+                            id = it.id.toString(),
+                            name = it.name,
+                            latitude = it.latitude,
+                            longitude = it.longitude,
+                            photoCount = 0,
+                            issueCount = 0
+                        ),
+                        orderIndex = it.orderIndex
+                    )
+                } + nonHomePois.map {
+                    PoiItem(
+                        id = it.id,
+                        name = it.name,
+                        city = it.city,
+                        address = it.address,
+                        region = it.region,
+                        latitude = it.latitude,
+                        longitude = it.longitude,
+                        orderIndex = it.orderIndex
+                    )
+                }).sortedBy { it.orderIndex }
+                
+                val startEntity = PoiEntity(
+                    id = homePoi.id.takeIf { it.isNotBlank() && it != "NEW" } ?: java.util.UUID.randomUUID().toString(),
+                    name = "Home",
+                    city = homePoi.city,
+                    address = homePoi.address,
+                    region = homePoi.region,
+                    latitude = homePoi.latitude,
+                    longitude = homePoi.longitude,
+                    inspectionDate = date,
+                    orderIndex = 0
+                )
+                poiDao.insertPoi(startEntity)
+                
+                nonHomeItems.forEachIndexed { idx, item ->
+                    val newIdx = idx + 1
+                    when (item) {
+                        is StationItem -> stationDao.updateStationOrder(item.station.id.toLong(), newIdx)
+                        is PoiItem -> poiDao.updatePoiOrder(item.id, newIdx)
                     }
                 }
-
-                stationDao.updateStationOrders(stationOrders)
-                poiDao.updatePoiOrders(poiOrders)
+                
+                if (isRoundTrip) {
+                    val endEntity = PoiEntity(
+                        id = java.util.UUID.randomUUID().toString(),
+                        name = "Home",
+                        city = homePoi.city,
+                        address = homePoi.address,
+                        region = homePoi.region,
+                        latitude = homePoi.latitude,
+                        longitude = homePoi.longitude,
+                        inspectionDate = date,
+                        orderIndex = nonHomeItems.size + 1
+                    )
+                    poiDao.insertPoi(endEntity)
+                }
             } else {
-                val poiEntity = PoiEntity(
-                    id = java.util.UUID.randomUUID().toString(),
-                    name = finalPoi.name,
-                    city = finalPoi.city,
-                    address = finalPoi.address,
-                    region = finalPoi.region,
-                    latitude = finalPoi.latitude,
-                    longitude = finalPoi.longitude,
-                    inspectionDate = date,
-                    orderIndex = maxOrder + 1
-                )
-                poiDao.insertPoi(poiEntity)
+                val remainingPois = pois.filter { it.name != "Home" }
+                val remainingItems = (stations.map {
+                    StationItem(
+                        station = StationWithCounts(
+                            id = it.id.toString(),
+                            name = it.name,
+                            latitude = it.latitude,
+                            longitude = it.longitude,
+                            photoCount = 0,
+                            issueCount = 0
+                        ),
+                        orderIndex = it.orderIndex
+                    )
+                } + remainingPois.map {
+                    PoiItem(
+                        id = it.id,
+                        name = it.name,
+                        city = it.city,
+                        address = it.address,
+                        region = it.region,
+                        latitude = it.latitude,
+                        longitude = it.longitude,
+                        orderIndex = it.orderIndex
+                    )
+                }).sortedBy { it.orderIndex }
+                
+                remainingItems.forEachIndexed { idx, item ->
+                    when (item) {
+                        is StationItem -> stationDao.updateStationOrder(item.station.id.toLong(), idx)
+                        is PoiItem -> poiDao.updatePoiOrder(item.id, idx)
+                    }
+                }
             }
         }
-        _searchQuery.value = ""
     }
 
     /**
@@ -519,16 +632,40 @@ class StationListViewModel @Inject constructor(
      */
     fun reorderItems(items: List<RouteListItem>) {
         viewModelScope.launch(Dispatchers.IO) {
-            val stationOrders = mutableListOf<Pair<Long, Int>>()
-            val poiOrders     = mutableListOf<Pair<String, Int>>()
-            items.forEachIndexed { index, item ->
-                when (item) {
-                    is StationItem -> stationOrders.add(item.station.id.toLong() to index)
-                    is PoiItem     -> poiOrders.add(item.id to index)
+            database.withTransaction {
+                val isRoundTrip = isRoundTripEnabled.value
+                val hasHome = items.any { it.name == "Home" }
+                
+                val adjustedList = if (hasHome) {
+                    val homePoints = items.filter { it.name == "Home" }
+                    val startHome = homePoints.first()
+                    val endHome = if (homePoints.size >= 2) homePoints.last() else null
+                    val middleItems = items.filter { it.name != "Home" }
+                    
+                    val result = mutableListOf<RouteListItem>()
+                    result.add(startHome)
+                    result.addAll(middleItems)
+                    if (isRoundTrip && endHome != null) {
+                        result.add(endHome)
+                    }
+                    result
+                } else {
+                    items
                 }
+
+                val stationOrders = mutableListOf<Pair<Long, Int>>()
+                val poiOrders     = mutableListOf<Pair<String, Int>>()
+                
+                adjustedList.forEachIndexed { index, item ->
+                    when (item) {
+                        is StationItem -> stationOrders.add(item.station.id.toLong() to index)
+                        is PoiItem     -> poiOrders.add(item.id to index)
+                    }
+                }
+                
+                if (stationOrders.isNotEmpty()) stationDao.updateStationOrders(stationOrders)
+                if (poiOrders.isNotEmpty())     poiDao.updatePoiOrders(poiOrders)
             }
-            if (stationOrders.isNotEmpty()) stationDao.updateStationOrders(stationOrders)
-            if (poiOrders.isNotEmpty())     poiDao.updatePoiOrders(poiOrders)
         }
     }
 
@@ -537,8 +674,16 @@ class StationListViewModel @Inject constructor(
     }
 
     fun deletePoi(id: String) {
+        val date = _selectedDate.value ?: return
         viewModelScope.launch(Dispatchers.IO) {
-            poiDao.deletePoi(id)
+            val pois = poiDao.getPoisForDateSync(date)
+            val poiToDelete = pois.firstOrNull { it.id == id }
+            if (poiToDelete != null && poiToDelete.name == "Home") {
+                rebuildHomePointsAndIndices(date, false, null, clearHome = true)
+            } else {
+                poiDao.deletePoi(id)
+                rebuildHomePointsAndIndices(date, isRoundTripEnabled.value)
+            }
         }
     }
 
@@ -639,7 +784,7 @@ class StationListViewModel @Inject constructor(
         }
         
         viewModelScope.launch {
-            routeItems.collect { items ->
+            routeItems.collectLatest { items ->
                 calculateDailyRoute(items)
                 _isExportButtonEnabled.value = items.filterIsInstance<StationItem>().sumOf { it.station.photoCount + it.station.issueCount } > 0
             }
@@ -665,63 +810,69 @@ class StationListViewModel @Inject constructor(
     // ── Internal helpers ───────────────────────────────────────────────────────
 
     private suspend fun calculateDailyRoute(dailyItems: List<RouteListItem>) {
-        val activeItems = dailyItems.filter { !it.isHidden }
-        if (activeItems.size < 2) {
-            _routeInfo.value = DailyRouteInfo(0.0, 0, 0, emptyList())
-            return
-        }
+        withContext(Dispatchers.IO) {
+            val activeItems = dailyItems.filter { !it.isHidden }
+            if (activeItems.size < 2) {
+                _routeInfo.value = DailyRouteInfo(0.0, 0, 0, emptyList())
+                return@withContext
+            }
 
-        var totalDistance = 0.0
-        var totalTime = 0L
-        val polylinePoints = mutableListOf<GeoPoint>()
+            var totalDistance = 0.0
+            var totalTime = 0L
+            val polylinePoints = mutableListOf<GeoPoint>()
 
-        val validItems = mutableListOf<RouteListItem>()
+            val validItems = mutableListOf<RouteListItem>()
 
-        for (item in activeItems) {
-            var lat = item.latitude
-            var lon = item.longitude
-            if (lat == 0.0 || lon == 0.0) {
-                if (item is StationItem) {
-                    val coords = routeRepository.fetchAndSaveCoordinates(item.id.toLong(), item.name)
-                    if (coords != null) {
-                        lat = coords.first
-                        lon = coords.second
+            for (item in activeItems) {
+                ensureActive()
+                var lat = item.latitude
+                var lon = item.longitude
+                if (lat == 0.0 || lon == 0.0) {
+                    if (item is StationItem) {
+                        val coords = routeRepository.fetchAndSaveCoordinates(item.id.toLong(), item.name)
+                        if (coords != null) {
+                            lat = coords.first
+                            lon = coords.second
+                        }
+                    }
+                }
+                if (lat != 0.0 && lon != 0.0) {
+                    if (item is StationItem) {
+                        validItems.add(StationItem(item.station.copy(latitude = lat, longitude = lon)))
+                    } else if (item is PoiItem) {
+                        validItems.add(item.copy(latitude = lat, longitude = lon))
                     }
                 }
             }
-            if (lat != 0.0 && lon != 0.0) {
-                if (item is StationItem) {
-                    validItems.add(StationItem(item.station.copy(latitude = lat, longitude = lon)))
-                } else if (item is PoiItem) {
-                    validItems.add(item.copy(latitude = lat, longitude = lon))
+
+            if (validItems.isNotEmpty()) {
+                polylinePoints.add(GeoPoint(validItems.first().latitude, validItems.first().longitude))
+            }
+
+            for ((s1, s2) in validItems.zipWithNext()) {
+                ensureActive()
+                try {
+                    val segment = routeRepository.getRouteSegment(s1.latitude, s1.longitude, s2.latitude, s2.longitude)
+                    totalDistance += segment.distanceMeters
+                    totalTime += segment.durationSeconds
+                    polylinePoints.addAll(PolylineUtils.decode(segment.geometry))
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.w(TAG, "Route segment fetch failed between '${s1.name}' and '${s2.name}'", e)
                 }
             }
+
+            val totalDistanceKm = totalDistance / 1000.0
+            val totalTimeMins = (totalTime / 60).toInt()
+
+            _routeInfo.value = DailyRouteInfo(
+                totalDistanceKm = totalDistanceKm,
+                totalTimeMins = totalTimeMins,
+                waypointCount = validItems.count { it.name != "Home" },
+                polylinePoints = polylinePoints.toList()
+            )
         }
-
-        if (validItems.isNotEmpty()) {
-            polylinePoints.add(GeoPoint(validItems.first().latitude, validItems.first().longitude))
-        }
-
-        for ((s1, s2) in validItems.zipWithNext()) {
-            try {
-                val segment = routeRepository.getRouteSegment(s1.latitude, s1.longitude, s2.latitude, s2.longitude)
-                totalDistance += segment.distanceMeters
-                totalTime += segment.durationSeconds
-                polylinePoints.addAll(PolylineUtils.decode(segment.geometry))
-            } catch (e: Exception) {
-                Log.w(TAG, "Route segment fetch failed between '${s1.name}' and '${s2.name}'", e)
-            }
-        }
-
-        val totalDistanceKm = totalDistance / 1000.0
-        val totalTimeMins = (totalTime / 60).toInt()
-
-        _routeInfo.value = DailyRouteInfo(
-            totalDistanceKm = totalDistanceKm,
-            totalTimeMins = totalTimeMins,
-            waypointCount = validItems.size,
-            polylinePoints = polylinePoints.toList()
-        )
     }
 
     private fun cleanStationName(rawName: String): String {

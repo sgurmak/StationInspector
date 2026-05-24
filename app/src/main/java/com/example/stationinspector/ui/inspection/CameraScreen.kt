@@ -27,6 +27,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,19 +51,14 @@ import com.example.stationinspector.domain.model.PhotoType
 import com.example.stationinspector.domain.model.PhotoZone
 import com.example.stationinspector.ui.navigation.ZONE_LIST
 import com.example.stationinspector.ui.navigation.ZoneMeta
+import com.example.stationinspector.ui.theme.AccentGreen
+import com.example.stationinspector.ui.theme.AccentPink
+import com.example.stationinspector.ui.theme.ContentDark
+import com.example.stationinspector.ui.theme.ContentLight
 import com.example.stationinspector.ui.theme.clickableNoRipple
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Design tokens
-// ─────────────────────────────────────────────────────────────────────────────
-
-private val CamLight  = Color(0xFFFBF7FF)
-private val CamDark   = Color(0xFF13111B)
-private val CamAccent = Color(0xFFCA065E)
-private val CamGreen  = Color(0xFF4ADE80)
 
 // Thumbnail / button assembly height (same to align vertically)
 private val CONTROL_HEIGHT = 102.dp
@@ -74,7 +70,7 @@ private val CONTROL_HEIGHT = 102.dp
 @Composable
 fun CameraScreen(
     viewModel:           ZoneInspectionViewModel = hiltViewModel(),
-    onNavigateToGallery: () -> Unit
+    onNavigateToGallery: (PhotoZone) -> Unit
 ) {
     val context        = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -85,8 +81,8 @@ fun CameraScreen(
     val photos       by viewModel.photos.collectAsState()
     val stationName  by viewModel.stationName.collectAsState()
 
-    var isFlashing by remember { mutableStateOf(false) }
-    var flashMode  by remember { mutableStateOf(ImageCapture.FLASH_MODE_AUTO) }
+    var isFlashing by rememberSaveable { mutableStateOf(false) }
+    var flashMode  by rememberSaveable { mutableStateOf(ImageCapture.FLASH_MODE_AUTO) }
     // ── Camera permission ─────────────────────────────────────────────────────
     var hasCameraPermission by remember {
         mutableStateOf(
@@ -101,6 +97,12 @@ fun CameraScreen(
 
     LaunchedEffect(Unit) {
         if (!hasCameraPermission) permissionLauncher.launch(Manifest.permission.CAMERA)
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.stopCamera()
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -175,7 +177,7 @@ fun CameraScreen(
                         else                        -> Icons.Filled.FlashAuto
                     },
                     contentDescription = "Flash",
-                    tint               = CamLight,
+                    tint               = ContentLight,
                     modifier           = Modifier.size(24.dp)
                 )
             }
@@ -201,13 +203,13 @@ fun CameraScreen(
 
             // ── Done / gallery checkmark (fixed right anchor) ─────────────────
             IconButton(
-                onClick  = onNavigateToGallery,
+                onClick  = { onNavigateToGallery(selectedZone) },
                 modifier = Modifier.size(40.dp)
             ) {
                 Icon(
                     imageVector        = Icons.Filled.CheckCircle,
                     contentDescription = "Finish",
-                    tint               = CamGreen,
+                    tint               = AccentGreen,
                     modifier           = Modifier.size(36.dp)
                 )
             }
@@ -231,7 +233,7 @@ fun CameraScreen(
                     text       = stationName,
                     fontSize   = 17.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color      = CamLight,
+                    color      = ContentLight,
                     textAlign  = TextAlign.Center,
                     maxLines   = 1,
                     modifier   = Modifier
@@ -274,7 +276,7 @@ fun CameraScreen(
                         Icon(
                             imageVector        = Icons.Filled.Delete,
                             contentDescription = "Delete",
-                            tint               = CamAccent,
+                            tint               = AccentPink,
                             modifier           = Modifier
                                 .align(Alignment.TopEnd)
                                 .padding(4.dp)
@@ -285,7 +287,7 @@ fun CameraScreen(
                         Icon(
                             imageVector        = Icons.Filled.Collections,
                             contentDescription = "No photos",
-                            tint               = CamLight.copy(alpha = 0.35f),
+                            tint               = ContentLight.copy(alpha = 0.35f),
                             modifier           = Modifier.size(32.dp)
                         )
                     }
@@ -300,10 +302,10 @@ fun CameraScreen(
                     verticalAlignment     = Alignment.CenterVertically
                 ) {
                     ShutterButton(
-                        outerBorderColor = CamLight,
-                        innerFillColor   = CamAccent,
+                        outerBorderColor = ContentLight,
+                        innerFillColor   = AccentPink,
                         label            = "Defects",
-                        labelColor       = CamAccent,
+                        labelColor       = AccentPink,
                         onClick          = {
                             viewModel.capturePhoto(PhotoType.INTERNAL_DEFECT)
                             scope.launch {
@@ -312,10 +314,10 @@ fun CameraScreen(
                         }
                     )
                     ShutterButton(
-                        outerBorderColor = CamLight,
-                        innerFillColor   = CamLight,
+                        outerBorderColor = ContentLight,
+                        innerFillColor   = ContentLight,
                         label            = "Photo",
-                        labelColor       = CamLight,
+                        labelColor       = ContentLight,
                         onClick          = {
                             viewModel.capturePhoto(PhotoType.CLIENT_REPORT)
                             scope.launch {
@@ -350,7 +352,7 @@ private fun ZoneItem(
     isSelected: Boolean,
     onClick:    () -> Unit
 ) {
-    val contentColor = if (isSelected) CamDark else CamLight
+    val contentColor = if (isSelected) ContentDark else ContentLight
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -366,7 +368,7 @@ private fun ZoneItem(
                 .height(64.dp)
                 .then(
                     if (isSelected)
-                        Modifier.background(CamLight, RoundedCornerShape(50))
+                        Modifier.background(ContentLight, RoundedCornerShape(50))
                     else
                         Modifier
                 ),
@@ -403,7 +405,7 @@ private fun ZoneItem(
             Text(
                 text      = ordCount.toString(),
                 fontSize  = 14.sp,
-                color     = CamLight,
+                color     = ContentLight,
                 textAlign = TextAlign.End,
                 modifier  = Modifier.widthIn(min = 20.dp)
             )
@@ -411,13 +413,13 @@ private fun ZoneItem(
             Text(
                 text     = " | ",
                 fontSize = 14.sp,
-                color    = CamLight.copy(alpha = 0.45f)
+                color    = ContentLight.copy(alpha = 0.45f)
             )
             // Defect count — left-aligned, grows RIGHT — always #CA065E
             Text(
                 text      = defCount.toString(),
                 fontSize  = 14.sp,
-                color     = CamAccent,
+                color     = AccentPink,
                 textAlign = TextAlign.Start,
                 modifier  = Modifier.widthIn(min = 20.dp)
             )

@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.StationInspector" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.StationInspector" parent="android:Theme.Material.NoActionBar">
+        <!-- Premium dark purple background to eliminate any cold start white flash -->
+        <item name="android:windowBackground">#13091F</item>
+        <item name="android:statusBarColor">#180D2C</item>
+        <item name="android:navigationBarColor">#0B0416</item>
+    </style>
 </resources>

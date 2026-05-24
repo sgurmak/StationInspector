@@ -30,4 +30,7 @@ interface PoiDao {
 
     @Query("DELETE FROM pois WHERE id = :id")
     suspend fun deletePoi(id: String)
+
+    @Query("DELETE FROM pois WHERE name = :name AND inspectionDate = :date")
+    suspend fun deletePoisByNameAndDate(name: String, date: java.time.LocalDate)
 }

@@ -29,14 +29,20 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
+import com.example.stationinspector.ui.theme.ContentLight
+import com.example.stationinspector.ui.theme.CardContent
+import com.example.stationinspector.ui.theme.AccentPink
+import com.example.stationinspector.ui.theme.AccentRed
+import com.example.stationinspector.ui.theme.AccentGreenAlt
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  Design tokens
 // ─────────────────────────────────────────────────────────────────────────────
 
-private val ExLight       = Color(0xFFFBF7FF)   // Text on dark bg, icons on dark bg
-private val ExDark        = Color(0xFF261937)   // Card content, button bg
-private val ExAccent      = Color(0xFFCA065E)   // Defect accent, progress indicator
-private val ExCardBg      = Color(0xFFFBF7FF)   // Info card background
+private val ExLight       = ContentLight   // Text on dark bg, icons on dark bg
+private val ExDark        = CardContent    // Card content, button bg
+private val ExAccent      = AccentPink     // Defect accent, progress indicator
+private val ExCardBg      = ContentLight   // Info card background
 
 private data class ExportStats(
     val defectPhotos: List<Photo>,
@@ -323,7 +329,7 @@ fun ExportScreenContent(
             modifier  = Modifier.align(Alignment.TopCenter)
         ) { data ->
             val snackColor = if (exportState == ExportState.ERROR)
-                Color(0xFFEF4444) else Color(0xFF16A34A)
+                AccentRed else AccentGreenAlt
             Snackbar(
                 snackbarData   = data,
                 containerColor = snackColor,

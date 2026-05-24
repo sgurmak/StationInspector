@@ -58,17 +58,23 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import androidx.compose.material3.ExperimentalMaterial3Api
 
+import com.example.stationinspector.ui.theme.ContentLight
+import com.example.stationinspector.ui.theme.CardContent
+import com.example.stationinspector.ui.theme.AccentPink
+import com.example.stationinspector.ui.theme.AccentGreenAlt
+import com.example.stationinspector.ui.theme.AppGradientTop
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  Design tokens
 // ─────────────────────────────────────────────────────────────────────────────
 
-private val DateCircleUnsel  = Color(0xFFFBF7FF)
-private val DateCircleSel    = Color(0xFF261937)
-private val DateTextUnsel    = Color(0xFF261937)
-private val DateTextSel      = Color(0xFFFBF7FF)
-private val OverlayBg        = Color(0xFF271A39)  // Map info bar background
-private val CardBg           = Color(0xFFFBF7FF)
-private val WarningRed       = Color(0xFFCA065E)
+private val DateCircleUnsel  = ContentLight
+private val DateCircleSel    = CardContent
+private val DateTextUnsel    = CardContent
+private val DateTextSel      = ContentLight
+private val OverlayBg        = AppGradientTop  // Map info bar background
+private val CardBg           = ContentLight
+private val WarningRed       = AccentPink
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Station List Screen — content only; Scaffold and gradient live in MainAppScreen
@@ -122,7 +128,7 @@ fun StationListScreen(
         ) { data ->
             Snackbar(
                 snackbarData   = data,
-                containerColor = Color(0xFF16A34A),
+                containerColor = AccentGreenAlt,
                 contentColor   = Color.White,
                 shape          = RoundedCornerShape(10.dp),
                 modifier       = Modifier.padding(top = 16.dp, start = 16.dp, end = 16.dp)
@@ -578,7 +584,7 @@ fun DateItem(
             modifier = Modifier
                 .size(48.dp)
                 .background(bgColor, CircleShape)
-                .then(if (isSelected) Modifier.border(1.dp, Color(0xFFFBF7FF), CircleShape) else Modifier)
+                .then(if (isSelected) Modifier.border(1.dp, ContentLight, CircleShape) else Modifier)
         ) {
             Text(
                 text       = dayNumber,
@@ -616,7 +622,7 @@ fun StationCard(
             .height(64.dp)
             .clip(RoundedCornerShape(12.dp))
             .then(
-                if (isHighlighted) Modifier.border(2.dp, Color(0xFFCA065E), RoundedCornerShape(12.dp))
+                if (isHighlighted) Modifier.border(2.dp, WarningRed, RoundedCornerShape(12.dp))
                 else Modifier
             )
             .background(CardBg)
@@ -738,7 +744,7 @@ fun PoiCard(
             .height(64.dp)
             .clip(RoundedCornerShape(12.dp))
             .then(
-                if (isHighlighted) Modifier.border(2.dp, Color(0xFFCA065E), RoundedCornerShape(12.dp))
+                if (isHighlighted) Modifier.border(2.dp, WarningRed, RoundedCornerShape(12.dp))
                 else Modifier
             )
             .background(CardBg)

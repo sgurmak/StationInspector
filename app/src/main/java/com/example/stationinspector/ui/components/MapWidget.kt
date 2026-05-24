@@ -33,6 +33,7 @@ fun MapWidget(
     editingPoi:    RouteListItem? = null,
     onMapCenterChange: ((org.osmdroid.util.GeoPoint) -> Unit)? = null,
     onGetCenterCallback: (( () -> org.osmdroid.util.GeoPoint ) -> Unit)? = null,
+    topPaddingPx: Int = 0,
     bottomPaddingPx: Int = 0,
     safeMarginPx: Int = 0,
     isInteractive:       Boolean = true,
@@ -136,6 +137,30 @@ fun MapWidget(
         }
     }
 
+    LaunchedEffect(routeItems, routeInfo.polylinePoints, isMapExpanded, editingPoi) {
+        if (isMapExpanded && editingPoi == null) {
+            val validItems = routeItems.filter { it.latitude != 0.0 && it.longitude != 0.0 }
+            val margin = if (safeMarginPx > 0) safeMarginPx else 120
+            val scrollY = (bottomPaddingPx - topPaddingPx) / 2
+
+            if (routeInfo.polylinePoints.isNotEmpty()) {
+                val box = org.osmdroid.util.BoundingBox.fromGeoPoints(routeInfo.polylinePoints)
+                mapView.post {
+                    mapView.zoomToBoundingBox(box, false, margin)
+                    mapView.scrollBy(0, scrollY)
+                }
+            } else if (validItems.isNotEmpty()) {
+                val box = org.osmdroid.util.BoundingBox.fromGeoPoints(
+                    validItems.map { org.osmdroid.util.GeoPoint(it.latitude, it.longitude) }
+                )
+                mapView.post {
+                    mapView.zoomToBoundingBox(box, false, margin)
+                    mapView.scrollBy(0, scrollY)
+                }
+            }
+        }
+    }
+
     // ── Render the osmdroid MapView inside Compose ────────────────────────────
 
     // ── Render the osmdroid MapView inside Compose ────────────────────────────
@@ -170,12 +195,27 @@ fun MapWidget(
             // The highlighted marker is deferred and added last so it renders above
             // the polyline and all other markers.
             val validItems = routeItems.filter { it.latitude != 0.0 && it.longitude != 0.0 && it.stableId != editingPoi?.stableId }
+            val isRoundTrip = !isMiniMap && validItems.size >= 2 &&
+                              validItems.first().name == "Home" &&
+                              validItems.last().name == "Home"
+
             var highlightedMarker: org.osmdroid.views.overlay.Marker? = null
             validItems.forEachIndexed { index, item ->
+                if (isRoundTrip && index == validItems.lastIndex) {
+                    return@forEachIndexed // Skip the last marker as it overlaps with the first one
+                }
+
                 val marker = org.osmdroid.views.overlay.Marker(view)
                 marker.infoWindow = null
                 marker.position = org.osmdroid.util.GeoPoint(item.latitude, item.longitude)
-                marker.title = "${index + 1}. ${item.name}"
+                
+                val markerLabel = if (isRoundTrip && index == 0) {
+                    "1/${validItems.size}"
+                } else {
+                    "${index + 1}"
+                }
+
+                marker.title = "$markerLabel. ${item.name}"
                 if (isMiniMap) {
                     if (index == highlightedItemIndex) {
                         marker.icon = createMiniHighlightedMarkerBitmap(context, index + 1)
@@ -193,7 +233,7 @@ fun MapWidget(
                         org.osmdroid.views.overlay.Marker.ANCHOR_CENTER
                     )
                 } else {
-                    marker.icon = createLargeNumberedMarkerBitmap(context, index + 1)
+                    marker.icon = createLargeNumberedMarkerBitmap(context, markerLabel)
                     marker.setAnchor(
                         org.osmdroid.views.overlay.Marker.ANCHOR_CENTER,
                         org.osmdroid.views.overlay.Marker.ANCHOR_BOTTOM
@@ -204,26 +244,7 @@ fun MapWidget(
             // Add highlighted marker on top of everything else
             highlightedMarker?.let { view.overlays.add(it) }
 
-            // ── Zoom to bounding box ──────────────────────────────────────────────
-            if (isMapExpanded && editingPoi == null) {
-                if (routeInfo.polylinePoints.isNotEmpty()) {
-                    val box = org.osmdroid.util.BoundingBox.fromGeoPoints(routeInfo.polylinePoints)
-                    view.post {
-                        view.zoomToBoundingBox(box, false, safeMarginPx)
-                        view.scrollBy(0, bottomPaddingPx / 2)
-                    }
-                } else if (validItems.isNotEmpty()) {
-                    val box = org.osmdroid.util.BoundingBox.fromGeoPoints(
-                        validItems.map {
-                            org.osmdroid.util.GeoPoint(it.latitude, it.longitude)
-                        }
-                    )
-                    view.post {
-                        view.zoomToBoundingBox(box, false, safeMarginPx)
-                        view.scrollBy(0, bottomPaddingPx / 2)
-                    }
-                }
-            }
+            // Zoom to bounding box logic moved to LaunchedEffect to avoid jitter during sheet scrolling
 
             // Force redraw
             view.invalidate()
@@ -232,14 +253,14 @@ fun MapWidget(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Full-map marker: large teardrop (80×120 px) with white number
+//  Full-map marker: large teardrop with white number or text label (e.g. 1/N)
 // ─────────────────────────────────────────────────────────────────────────────
 
 fun createLargeNumberedMarkerBitmap(
     context: android.content.Context,
-    number:  Int
+    number:  String
 ): android.graphics.drawable.BitmapDrawable {
-    val width  = 80
+    val width  = if (number.length > 2) 110 else 80
     val height = 120
     val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
     val canvas = android.graphics.Canvas(bitmap)
@@ -258,12 +279,17 @@ fun createLargeNumberedMarkerBitmap(
 
     val textPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
         color          = android.graphics.Color.WHITE
-        textSize       = 36f
+        textSize       = when {
+            number.length > 4 -> 22f
+            number.length > 3 -> 26f
+            number.length > 2 -> 30f
+            else -> 36f
+        }
         textAlign      = android.graphics.Paint.Align.CENTER
         isFakeBoldText = true
     }
     val textY = radius - ((textPaint.descent() + textPaint.ascent()) / 2f)
-    canvas.drawText(number.toString(), radius, textY, textPaint)
+    canvas.drawText(number, radius, textY, textPaint)
 
     return android.graphics.drawable.BitmapDrawable(context.resources, bitmap)
 }
