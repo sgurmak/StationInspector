@@ -15,7 +15,8 @@ import com.example.stationinspector.domain.repository.TransactionRunner
 import com.example.stationinspector.utils.PolylineUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
+import com.example.stationinspector.di.IoDispatcher
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -55,7 +56,8 @@ class RouteViewModel @Inject constructor(
     private val poiRepository: PoiRepository,
     private val preferencesRepository: PreferencesRepository,
     private val shortcutRepository: ShortcutRepository,
-    private val transactionRunner: TransactionRunner
+    private val transactionRunner: TransactionRunner,
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : ViewModel() {
 
     private companion object {
@@ -73,7 +75,7 @@ class RouteViewModel @Inject constructor(
             preferencesRepository.setRoundTripEnabled(enabled)
             val date = _selectedDate.value
             if (date != null) {
-                withContext(Dispatchers.IO) {
+                withContext(ioDispatcher) {
                     rebuildHomePointsAndIndices(date, enabled)
                 }
             }
@@ -181,7 +183,7 @@ class RouteViewModel @Inject constructor(
         if (_isOptimizing.value) return
         _isOptimizing.value = true
 
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             try {
                 val waypoints = validItems.map {
                     RouteWaypoint(id = it.id, isStation = it.isStation, latitude = it.latitude, longitude = it.longitude)
@@ -228,7 +230,7 @@ class RouteViewModel @Inject constructor(
     fun cancelEditingPoi() { _editingPoi.value = null }
 
     fun saveEditedPoi(poi: RouteListItem, lat: Double, lon: Double) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             val date = _selectedDate.value ?: run {
                 Log.w(TAG, "saveEditedPoi called with no selected date — aborting write")
                 return@launch
@@ -273,7 +275,7 @@ class RouteViewModel @Inject constructor(
 
     fun addPoiToRoute(poi: PoiItem) {
         val date = _selectedDate.value ?: return
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             transactionRunner.runInTransaction {
                 insertPoiAtCorrectOrderIndex(poi, date)
             }
@@ -282,7 +284,7 @@ class RouteViewModel @Inject constructor(
 
     fun addShortcutToRoute(shortcutId: String, poi: PoiItem) {
         val date = _selectedDate.value ?: return
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             val finalPoi = when (shortcutId) {
                 Shortcut.ID_HOME -> poi.copy(name = NAME_HOME)
                 Shortcut.ID_WORK -> poi.copy(name = NAME_WORK)
@@ -446,7 +448,7 @@ class RouteViewModel @Inject constructor(
      * Room emission reflects the reordering rather than reverting.
      */
     fun reorderItems(items: List<RouteListItem>) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             transactionRunner.runInTransaction {
                 val isRoundTrip = isRoundTripEnabled.value
                 val hasHome = items.any { it.name == NAME_HOME }
@@ -490,7 +492,7 @@ class RouteViewModel @Inject constructor(
 
     fun deletePoi(id: String) {
         val date = _selectedDate.value ?: return
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             val pois = poiRepository.getPoisForDate(date)
             val poiToDelete = pois.firstOrNull { it.id == id }
             if (poiToDelete != null && poiToDelete.name == NAME_HOME) {
@@ -528,7 +530,7 @@ class RouteViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            withContext(Dispatchers.IO) {
+            withContext(ioDispatcher) {
                 stationRepository.seedCoordinatesIfMissing()
             }
             // JOIN query keeps photo/issue counts in sync; Room re-emits on change.
@@ -569,7 +571,7 @@ class RouteViewModel @Inject constructor(
     }
 
     private suspend fun calculateDailyRoute(dailyItems: List<RouteListItem>) {
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             val activeItems = dailyItems.filter { !it.isHidden }
             if (activeItems.size < 2) {
                 _routeInfo.value = DailyRouteInfo(0.0, 0, 0, emptyList())
