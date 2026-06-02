@@ -21,34 +21,43 @@ class ParseStationsCsvUseCase @Inject constructor() {
 
     private val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
 
-    operator fun invoke(csvContent: String): List<Station> {
-        val rawStations = csvContent.lineSequence().mapNotNull { rawLine ->
-            val line = rawLine.trim()
-            if (line.isBlank()) return@mapNotNull null
+    /** Convenience overload for in-memory text (used by unit tests). */
+    operator fun invoke(csvContent: String): List<Station> = invoke(csvContent.lineSequence())
 
-            val parts = if (line.contains(';')) line.split(';') else line.split(',')
-            if (parts.size < 2) return@mapNotNull null
+    /**
+     * Streaming entry point: parses a lazy [Sequence] of lines so the caller can
+     * feed a file line-by-line without loading it entirely into memory. Only the
+     * (small) parsed station list is materialized for deduplication.
+     */
+    operator fun invoke(lines: Sequence<String>): List<Station> =
+        lines.mapNotNull { parseLine(it) }
+            .toList()
+            // Deduplicate: one entry per physical (cleaned) station name.
+            .distinctBy { it.name }
 
-            val name = parts[0].trim()
-            val dateStr = parts[1].trim()
-            if (name.isBlank() || dateStr.isBlank()) return@mapNotNull null
+    private fun parseLine(rawLine: String): Station? {
+        val line = rawLine.trim()
+        if (line.isBlank()) return null
 
-            val date = try {
-                LocalDate.parse(dateStr, dateFormatter)
-            } catch (e: DateTimeParseException) {
-                null
-            }
+        val parts = if (line.contains(';')) line.split(';') else line.split(',')
+        if (parts.size < 2) return null
 
-            Station(
-                id = 0,
-                name = StationNameCleaner.clean(name),
-                address = "",
-                inspectionDate = date,
-                status = StationStatus.PENDING
-            )
-        }.toList()
+        val name = parts[0].trim()
+        val dateStr = parts[1].trim()
+        if (name.isBlank() || dateStr.isBlank()) return null
 
-        // Deduplicate: one entry per physical (cleaned) station name.
-        return rawStations.distinctBy { it.name }
+        val date = try {
+            LocalDate.parse(dateStr, dateFormatter)
+        } catch (e: DateTimeParseException) {
+            null
+        }
+
+        return Station(
+            id = 0,
+            name = StationNameCleaner.clean(name),
+            address = "",
+            inspectionDate = date,
+            status = StationStatus.PENDING
+        )
     }
 }

@@ -28,8 +28,11 @@ class ImportStationsUseCase @Inject constructor(
         ioDispatcher: CoroutineDispatcher = Dispatchers.IO
     ): Result<Int> = withContext(ioDispatcher) {
         runCatching {
-            val content = inputStream.use { it.readBytes().toString(Charsets.UTF_8) }
-            val stations = parseStationsCsv(content)
+            // Stream line-by-line instead of readBytes() so an oversized/hostile
+            // file (the picker uses GetContent("*/*")) cannot OOM the process.
+            val stations = inputStream.bufferedReader(Charsets.UTF_8).useLines { lines ->
+                parseStationsCsv(lines)
+            }
 
             stations.forEach { station ->
                 try {
