@@ -606,20 +606,20 @@ fun DateItem(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Station Card
+//  Route cards — shared 64dp scaffold (highlight border, background, sequence
+//  number) + a per-card content slot rendered inside the row.
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
-fun StationCard(
-    station:        StationWithCounts,
+private fun RouteCardScaffold(
     sequenceNumber: Int,
-    isHighlighted:  Boolean = false,
-    onClick:        () -> Unit
+    isHighlighted: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable RowScope.() -> Unit
 ) {
-    val context = LocalContext.current
-
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(64.dp)
             .clip(RoundedCornerShape(12.dp))
@@ -636,7 +636,6 @@ fun StationCard(
                 .padding(start = 12.dp, end = 0.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Sequence number
             Text(
                 text          = sequenceNumber.toString(),
                 fontSize      = 36.sp,
@@ -646,139 +645,123 @@ fun StationCard(
                 modifier      = Modifier.width(52.dp),
                 textAlign     = TextAlign.Start
             )
-
-            // Station name + train icon + counters
-            Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    verticalAlignment      = Alignment.CenterVertically,
-                    horizontalArrangement  = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(
-                        imageVector        = Icons.Filled.Train,
-                        contentDescription = null,
-                        tint               = CardContent,
-                        modifier           = Modifier.size(22.dp)
-                    )
-                    Text(
-                        text       = station.name,
-                        fontSize   = 18.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color      = CardContent,
-                        maxLines   = 1,
-                        overflow   = TextOverflow.Ellipsis
-                    )
-                }
-                Spacer(modifier = Modifier.height(2.dp))
-                Row(
-                    verticalAlignment     = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(
-                        imageVector        = Icons.Default.Image,
-                        contentDescription = "Photos",
-                        tint               = CardContent,
-                        modifier           = Modifier.size(15.dp)
-                    )
-                    Text(
-                        text     = station.photoCount.toString(),
-                        fontSize = 14.sp,
-                        color    = CardContent
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Icon(
-                        imageVector        = Icons.Default.Warning,
-                        contentDescription = "Issues",
-                        tint               = WarningAccent,
-                        modifier           = Modifier.size(15.dp)
-                    )
-                    Text(
-                        text     = station.issueCount.toString(),
-                        fontSize = 14.sp,
-                        color    = WarningAccent
-                    )
-                }
-            }
-
-            // Navigation button
-            IconButton(
-                onClick  = {
-                    if (station.latitude != 0.0 && station.longitude != 0.0) {
-                        context.openInMaps(station.latitude, station.longitude, station.name)
-                    } else {
-                        Toast.makeText(context, "Coordinates not found for this station", Toast.LENGTH_SHORT).show()
-                    }
-                },
-                modifier = Modifier.size(80.dp)
-            ) {
-                Icon(
-                    imageVector        = Icons.Default.Place,
-                    contentDescription = "Navigate to station",
-                    tint               = CardContent,
-                    modifier           = Modifier.size(32.dp)
-                )
-            }
+            content()
         }
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  POI Card
-// ─────────────────────────────────────────────────────────────────────────────
+@Composable
+fun StationCard(
+    station:        StationWithCounts,
+    sequenceNumber: Int,
+    isHighlighted:  Boolean = false,
+    modifier:       Modifier = Modifier,
+    onClick:        () -> Unit
+) {
+    val context = LocalContext.current
+
+    RouteCardScaffold(sequenceNumber, isHighlighted, onClick, modifier) {
+        // Station name + train icon + counters
+        Column(modifier = Modifier.weight(1f)) {
+            Row(
+                verticalAlignment      = Alignment.CenterVertically,
+                horizontalArrangement  = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector        = Icons.Filled.Train,
+                    contentDescription = null,
+                    tint               = CardContent,
+                    modifier           = Modifier.size(22.dp)
+                )
+                Text(
+                    text       = station.name,
+                    fontSize   = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color      = CardContent,
+                    maxLines   = 1,
+                    overflow   = TextOverflow.Ellipsis
+                )
+            }
+            Spacer(modifier = Modifier.height(2.dp))
+            Row(
+                verticalAlignment     = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector        = Icons.Default.Image,
+                    contentDescription = "Photos",
+                    tint               = CardContent,
+                    modifier           = Modifier.size(15.dp)
+                )
+                Text(
+                    text     = station.photoCount.toString(),
+                    fontSize = 14.sp,
+                    color    = CardContent
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Icon(
+                    imageVector        = Icons.Default.Warning,
+                    contentDescription = "Issues",
+                    tint               = WarningAccent,
+                    modifier           = Modifier.size(15.dp)
+                )
+                Text(
+                    text     = station.issueCount.toString(),
+                    fontSize = 14.sp,
+                    color    = WarningAccent
+                )
+            }
+        }
+
+        // Navigation button
+        IconButton(
+            onClick  = {
+                if (station.latitude != 0.0 && station.longitude != 0.0) {
+                    context.openInMaps(station.latitude, station.longitude, station.name)
+                } else {
+                    Toast.makeText(context, "Coordinates not found for this station", Toast.LENGTH_SHORT).show()
+                }
+            },
+            modifier = Modifier.size(80.dp)
+        ) {
+            Icon(
+                imageVector        = Icons.Default.Place,
+                contentDescription = "Navigate to station",
+                tint               = CardContent,
+                modifier           = Modifier.size(32.dp)
+            )
+        }
+    }
+}
 
 @Composable
 fun PoiCard(
     poi:            PoiItem,
     sequenceNumber: Int,
     isHighlighted:  Boolean = false,
+    modifier:       Modifier = Modifier,
     onClick:        () -> Unit
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(64.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .then(
-                if (isHighlighted) Modifier.border(2.dp, WarningAccent, RoundedCornerShape(12.dp))
-                else Modifier
-            )
-            .background(CardBg)
-            .clickable { onClick() }
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(start = 12.dp, end = 0.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text          = sequenceNumber.toString(),
-                fontSize      = 36.sp,
-                fontWeight    = FontWeight.SemiBold,
-                letterSpacing = (-0.1).sp,
-                color         = CardContent,
-                modifier      = Modifier.width(52.dp),
-                textAlign     = TextAlign.Start
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    verticalAlignment     = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(
-                        imageVector        = Icons.Default.Place,
-                        contentDescription = null,
-                        tint               = CardContent,
-                        modifier           = Modifier.size(22.dp)
-                    )
-                    Text(
-                        text       = poi.name,
-                        fontSize   = 18.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color      = CardContent,
-                        maxLines   = 1,
-                        overflow   = TextOverflow.Ellipsis
-                    )
-                }
+    RouteCardScaffold(sequenceNumber, isHighlighted, onClick, modifier) {
+        Column(modifier = Modifier.weight(1f)) {
+            Row(
+                verticalAlignment     = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector        = Icons.Default.Place,
+                    contentDescription = null,
+                    tint               = CardContent,
+                    modifier           = Modifier.size(22.dp)
+                )
+                Text(
+                    text       = poi.name,
+                    fontSize   = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color      = CardContent,
+                    maxLines   = 1,
+                    overflow   = TextOverflow.Ellipsis
+                )
             }
         }
     }
