@@ -24,8 +24,8 @@ DI wires everything via 3 Hilt modules: `AppModule`, `DatabaseModule`, `NetworkM
 ## Key limitations and issues (important for agents)
 1. **Hardcoded API keys** — [RESOLVED] Moved to `local.properties` → `BuildConfig`.
 2. **`fallbackToDestructiveMigration()` enabled** in `DatabaseModule.kt:41` — will silently destroy all user data if a migration path is missing.
-3. **StationListViewModel breaks clean architecture** — directly injects `ShortcutDao`, `PoiDao`, `StationDao` alongside repository interfaces.
-4. **No test coverage** — only boilerplate example tests exist. No regression protection for business logic.
+3. **StationListViewModel breaks clean architecture** — [RESOLVED] Split into `RouteViewModel`, `SearchViewModel`, `ShortcutsViewModel`, `SettingsViewModel`; DAOs replaced by `ShortcutRepository`/`PoiRepository`/`PreferencesRepository` + a `StationRepository` ordering API. UI models live in `ui/screens/RouteModels.kt`; CSV/name-clean logic in `domain/usecase/`.
+4. **No test coverage** — [PARTIAL] 25 unit tests now cover `StationNameCleaner`, `ParseStationsCsvUseCase`, and the Shortcut/Poi mappers (`app/src/test`). ViewModels and Compose UI remain untested.
 
 ## Files with detailed documentation (open if necessary)
 
