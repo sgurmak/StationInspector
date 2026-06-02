@@ -1,5 +1,6 @@
 package com.example.stationinspector.ui.export
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.*
@@ -43,7 +44,7 @@ class ExportViewModel @Inject constructor(
         try {
             _selectedDate.value = LocalDate.parse(dateStr)
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.w("ExportViewModel", "Invalid export date '$dateStr'", e)
         }
     }
 

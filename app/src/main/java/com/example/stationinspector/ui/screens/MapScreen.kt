@@ -41,7 +41,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.stationinspector.data.local.entity.ShortcutEntity
 import com.example.stationinspector.ui.components.MapWidget
 import org.burnoutcrew.reorderable.rememberReorderableLazyListState
 import org.burnoutcrew.reorderable.reorderable
@@ -1052,8 +1051,8 @@ fun SearchResultsListPreview() {
 fun ShortcutsRowPreview() {
     ShortcutsRow(
         shortcuts = listOf(
-            ShortcutUiModel("1", "Home", null, null, true, false, ShortcutEntity("1", "Home", null, null, true)),
-            ShortcutUiModel("2", "Work", null, null, true, false, ShortcutEntity("2", "Work", null, null, true))
+            ShortcutUiModel("1", "Home", null, null, true, false),
+            ShortcutUiModel("2", "Work", null, null, true, false)
         ),
         onShortcutClick = {},
         onShortcutLongClick = {},
@@ -1075,8 +1074,8 @@ fun MapScreenContentPreview() {
         polylinePoints = emptyList()
     )
     val sampleShortcuts = listOf(
-        ShortcutUiModel("1", "Home", null, null, true, false, ShortcutEntity("1", "Home", null, null, true)),
-        ShortcutUiModel("2", "Work", null, null, true, false, ShortcutEntity("2", "Work", null, null, true))
+        ShortcutUiModel("1", "Home", null, null, true, false),
+        ShortcutUiModel("2", "Work", null, null, true, false)
     )
 
     MapScreenContent(

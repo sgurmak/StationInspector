@@ -27,8 +27,6 @@ import androidx.compose.material.icons.filled.Train
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,8 +42,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.stationinspector.ui.components.MapWidget
-import com.example.stationinspector.ui.theme.CardContent
-import com.example.stationinspector.ui.theme.ContentLight
 import java.time.LocalDate
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -54,7 +50,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
-import androidx.compose.material3.ExperimentalMaterial3Api
 
 import com.example.stationinspector.ui.theme.ContentLight
 import com.example.stationinspector.ui.theme.CardContent

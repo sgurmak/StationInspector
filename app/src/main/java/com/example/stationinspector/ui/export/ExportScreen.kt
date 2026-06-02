@@ -2,6 +2,7 @@ package com.example.stationinspector.ui.export
 
 import android.content.Intent
 import android.net.Uri
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -93,7 +94,7 @@ fun ExportScreen(
                         }
                         context.startActivity(Intent.createChooser(shareIntent, "Send report"))
                     } catch (e: Exception) {
-                        e.printStackTrace()
+                        Log.w("ExportScreen", "Failed to launch share intent", e)
                     }
                 }
                 onExportSuccess()

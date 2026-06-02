@@ -162,8 +162,6 @@ fun MapWidget(
     }
 
     // ── Render the osmdroid MapView inside Compose ────────────────────────────
-
-    // ── Render the osmdroid MapView inside Compose ────────────────────────────
     AndroidView(
         modifier = modifier
             .fillMaxWidth()

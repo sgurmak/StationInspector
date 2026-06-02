@@ -1,7 +1,6 @@
 package com.example.stationinspector.ui.screens
 
 import androidx.compose.runtime.Immutable
-import com.example.stationinspector.data.local.entity.ShortcutEntity
 import com.example.stationinspector.domain.model.Poi
 import com.example.stationinspector.domain.model.PoiLocation
 import com.example.stationinspector.domain.model.Shortcut
@@ -80,8 +79,7 @@ data class ShortcutUiModel(
     val customName: String?,
     val poiItem: PoiItem?,
     val isNew: Boolean,
-    val isRoundTrip: Boolean,
-    val entity: ShortcutEntity
+    val isRoundTrip: Boolean
 )
 
 sealed interface SearchUiState {
@@ -104,18 +102,7 @@ internal fun Shortcut.toUiModel(): ShortcutUiModel = ShortcutUiModel(
     customName  = customName,
     poiItem     = location?.toPoiItem(),
     isNew       = isNew,
-    isRoundTrip = isRoundTrip,
-    // Synthesized for source compatibility with existing previews. The `entity`
-    // field is no longer the canonical source — the repository is. Slated for
-    // removal in a later UI cleanup.
-    entity      = ShortcutEntity(
-        id          = id,
-        label       = label,
-        customName  = customName,
-        poiItemJson = null,
-        isNew       = isNew,
-        isRoundTrip = isRoundTrip
-    )
+    isRoundTrip = isRoundTrip
 )
 
 internal fun PoiLocation.toPoiItem(): PoiItem = PoiItem(
