@@ -53,6 +53,10 @@ object AppModule {
         val client = OkHttpClient.Builder()
             .addInterceptor(authInterceptor)
             .addInterceptor(loggingInterceptor)
+            // Match the ORS client — without these the Mapy.cz client used the
+            // 10s OkHttp defaults, so geocoding timed out inconsistently.
+            .connectTimeout(45, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(45, java.util.concurrent.TimeUnit.SECONDS)
             .build()
 
         return retrofit2.Retrofit.Builder()
