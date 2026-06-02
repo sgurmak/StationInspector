@@ -67,7 +67,7 @@ private val DateTextUnsel    = CardContent
 private val DateTextSel      = ContentLight
 private val OverlayBg        = AppGradientTop  // Map info bar background
 private val CardBg           = ContentLight
-private val WarningRed       = AccentPink
+private val WarningAccent       = AccentPink
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Station List Screen — content only; Scaffold and gradient live in MainAppScreen
@@ -296,8 +296,8 @@ private fun RouteContent(
         if (isMapExpanded && routeItems.size >= 2) {
             val sliderHeightDp = mapHeight - 40.dp - 24.dp
             val sliderColors = SliderDefaults.colors(
-                thumbColor         = WarningRed,
-                activeTrackColor   = WarningRed,
+                thumbColor         = WarningAccent,
+                activeTrackColor   = WarningAccent,
                 inactiveTrackColor = ContentLight.copy(alpha = 0.30f)
             )
             Slider(
@@ -624,7 +624,7 @@ fun StationCard(
             .height(64.dp)
             .clip(RoundedCornerShape(12.dp))
             .then(
-                if (isHighlighted) Modifier.border(2.dp, WarningRed, RoundedCornerShape(12.dp))
+                if (isHighlighted) Modifier.border(2.dp, WarningAccent, RoundedCornerShape(12.dp))
                 else Modifier
             )
             .background(CardBg)
@@ -688,13 +688,13 @@ fun StationCard(
                     Icon(
                         imageVector        = Icons.Default.Warning,
                         contentDescription = "Issues",
-                        tint               = WarningRed,
+                        tint               = WarningAccent,
                         modifier           = Modifier.size(15.dp)
                     )
                     Text(
                         text     = station.issueCount.toString(),
                         fontSize = 14.sp,
-                        color    = WarningRed
+                        color    = WarningAccent
                     )
                 }
             }
@@ -738,7 +738,7 @@ fun PoiCard(
             .height(64.dp)
             .clip(RoundedCornerShape(12.dp))
             .then(
-                if (isHighlighted) Modifier.border(2.dp, WarningRed, RoundedCornerShape(12.dp))
+                if (isHighlighted) Modifier.border(2.dp, WarningAccent, RoundedCornerShape(12.dp))
                 else Modifier
             )
             .background(CardBg)

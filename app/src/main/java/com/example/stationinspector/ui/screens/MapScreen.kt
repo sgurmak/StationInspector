@@ -55,12 +55,6 @@ import com.example.stationinspector.ui.theme.CardContent
 import com.example.stationinspector.ui.theme.AccentGreenConfirm
 import com.example.stationinspector.ui.theme.AccentPink
 
-// ── Local Screen Design Tokens ───────────────────────────────────────────────
-private val MapDark        = ContentDark
-private val MapLight       = ContentLight
-private val MapAccent      = AccentPink
-private val MapTextLight   = ContentLightSecondary
-private val MapCardContent = CardContent
 
 @Composable
 fun MapScreen(
@@ -219,7 +213,7 @@ fun MapScreenContent(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(MapDark)
+                        .background(ContentDark)
                         .windowInsetsPadding(WindowInsets.statusBars)
                         .height(72.dp)
                         .padding(horizontal = 16.dp),
@@ -239,7 +233,7 @@ fun MapScreenContent(
         sheetContent = {
             if (editingPoi == null) {
                 if (editingShortcut != null) {
-                    ModalBottomSheet(onDismissRequest = { editingShortcut = null }, containerColor = MapDark) {
+                    ModalBottomSheet(onDismissRequest = { editingShortcut = null }, containerColor = ContentDark) {
                         var text by remember { mutableStateOf(editingShortcut!!.customName ?: editingShortcut!!.label) }
                         val currentPoi = editingShortcut!!.poiItem
                         
@@ -262,7 +256,7 @@ fun MapScreenContent(
                                         .padding(vertical = 8.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(Icons.Default.Edit, contentDescription = "Edit Address", tint = MapTextLight.copy(alpha = 0.7f), modifier = Modifier.size(20.dp))
+                                    Icon(Icons.Default.Edit, contentDescription = "Edit Address", tint = ContentLightSecondary.copy(alpha = 0.7f), modifier = Modifier.size(20.dp))
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Column(modifier = Modifier.weight(1f)) {
                                         if (currentPoi != null) {
@@ -294,7 +288,7 @@ fun MapScreenContent(
                                         editingShortcut = null
                                     }
                                 ) {
-                                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MapAccent)
+                                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = AccentPink)
                                 }
                             }
 
@@ -303,10 +297,10 @@ fun MapScreenContent(
                             OutlinedTextField(
                                 value = text,
                                 onValueChange = { if (it.length <= 10) text = it },
-                                label = { Text("Shortcut Name", color = MapTextLight) },
+                                label = { Text("Shortcut Name", color = ContentLightSecondary) },
                                 colors = OutlinedTextFieldDefaults.colors(
-                                    focusedTextColor = MapTextLight,
-                                    unfocusedTextColor = MapTextLight
+                                    focusedTextColor = ContentLightSecondary,
+                                    unfocusedTextColor = ContentLightSecondary
                                 ),
                                 modifier = Modifier.fillMaxWidth(),
                                 trailingIcon = {
@@ -315,7 +309,7 @@ fun MapScreenContent(
                                         onUpdateShortcut(shortcut.id, currentPoi, text)
                                         editingShortcut = null
                                     }) {
-                                        Icon(Icons.Default.Check, contentDescription = "Save Name", tint = MapTextLight)
+                                        Icon(Icons.Default.Check, contentDescription = "Save Name", tint = ContentLightSecondary)
                                     }
                                 }
                             )
@@ -328,7 +322,7 @@ fun MapScreenContent(
                                     Switch(
                                         checked = isRoundTrip,
                                         onCheckedChange = { onSetRoundTripEnabled(it) },
-                                        colors = SwitchDefaults.colors(checkedThumbColor = MapAccent, checkedTrackColor = MapAccent.copy(alpha = 0.5f))
+                                        colors = SwitchDefaults.colors(checkedThumbColor = AccentPink, checkedTrackColor = AccentPink.copy(alpha = 0.5f))
                                     )
                                 }
                             }
@@ -344,7 +338,7 @@ fun MapScreenContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(sheetMaxHeight)
-                        .background(MapDark.copy(alpha = 0.9f))
+                        .background(ContentDark.copy(alpha = 0.9f))
                 ) {
                     Column(modifier = Modifier.fillMaxSize()) {
                         Box(
@@ -352,7 +346,7 @@ fun MapScreenContent(
                                 .padding(top = 6.dp)
                                 .width(56.dp)
                                 .height(4.dp)
-                                .background(MapTextLight, RoundedCornerShape(2.dp))
+                                .background(ContentLightSecondary, RoundedCornerShape(2.dp))
                                 .align(Alignment.CenterHorizontally)
                         )
                         
@@ -364,11 +358,11 @@ fun MapScreenContent(
                                 .padding(horizontal = 14.dp)
                                 .padding(top = 12.dp)
                                 .height(40.dp)
-                                .background(MapLight, RoundedCornerShape(20.dp))
+                                .background(ContentLight, RoundedCornerShape(20.dp))
                                 .padding(horizontal = 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.Search, contentDescription = null, tint = MapCardContent, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.Search, contentDescription = null, tint = CardContent, modifier = Modifier.size(20.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             BasicTextField(
                                 value = searchQuery,
@@ -387,12 +381,12 @@ fun MapScreenContent(
                                             coroutineScope.launch { scaffoldState.bottomSheetState.expand() }
                                         }
                                     },
-                                textStyle = androidx.compose.ui.text.TextStyle(color = MapCardContent, fontSize = 14.sp),
+                                textStyle = androidx.compose.ui.text.TextStyle(color = CardContent, fontSize = 14.sp),
                                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                                 keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
                                 decorationBox = { innerTextField ->
                                     if (searchQuery.isEmpty()) {
-                                        Text("Where to?", color = MapCardContent.copy(alpha = 0.5f), fontSize = 14.sp)
+                                        Text("Where to?", color = CardContent.copy(alpha = 0.5f), fontSize = 14.sp)
                                     }
                                     innerTextField()
                                 }
@@ -401,7 +395,7 @@ fun MapScreenContent(
                                 Icon(
                                     imageVector = Icons.Default.Close,
                                     contentDescription = "Clear search",
-                                    tint = MapCardContent.copy(alpha = 0.5f),
+                                    tint = CardContent.copy(alpha = 0.5f),
                                     modifier = Modifier
                                         .size(20.dp)
                                         .clickable {
@@ -455,7 +449,7 @@ fun MapScreenContent(
                                 text = "List of points",
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color = MapTextLight,
+                                color = ContentLightSecondary,
                                 modifier = Modifier.padding(top = 16.dp, start = 14.dp, bottom = 6.dp)
                             )
                             
@@ -534,18 +528,18 @@ fun MapInfoBlock(
     modifier: Modifier = Modifier
 ) {
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        Icon(imageVector = icon, contentDescription = null, tint = MapTextLight, modifier = Modifier.size(24.dp))
+        Icon(imageVector = icon, contentDescription = null, tint = ContentLightSecondary, modifier = Modifier.size(24.dp))
         Spacer(modifier = Modifier.width(8.dp))
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = value,
-                color = MapTextLight,
+                color = ContentLightSecondary,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold
             )
             Text(
                 text = label,
-                color = MapTextLight.copy(alpha = 0.7f),
+                color = ContentLightSecondary.copy(alpha = 0.7f),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium
             )
@@ -564,27 +558,27 @@ fun ShortcutConfirmationDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Save to Shortcut", color = MapTextLight) },
+        title = { Text("Save to Shortcut", color = ContentLightSecondary) },
         text = { 
             Column {
-                Text("Do you want to bind ${poi.name} to this shortcut slot?", color = MapTextLight.copy(alpha = 0.8f))
+                Text("Do you want to bind ${poi.name} to this shortcut slot?", color = ContentLightSecondary.copy(alpha = 0.8f))
                 Spacer(modifier = Modifier.height(16.dp))
                 OutlinedTextField(
                     value = confirmName,
                     onValueChange = { if (it.length <= 10) confirmName = it },
-                    label = { Text("Shortcut Name", color = MapTextLight) },
+                    label = { Text("Shortcut Name", color = ContentLightSecondary) },
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = MapTextLight,
-                        unfocusedTextColor = MapTextLight
+                        focusedTextColor = ContentLightSecondary,
+                        unfocusedTextColor = ContentLightSecondary
                     ),
                     modifier = Modifier.fillMaxWidth()
                 )
             }
         },
-        containerColor = MapDark,
+        containerColor = ContentDark,
         confirmButton = {
             TextButton(onClick = { onConfirm(confirmName) }) {
-                Text("Confirm", color = MapAccent, fontWeight = FontWeight.Bold)
+                Text("Confirm", color = AccentPink, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
@@ -602,12 +596,12 @@ fun StationEditConfirmationDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Confirm Move", color = MapTextLight) },
-        text = { Text("Are you sure you want to permanently update the coordinates for this station?", color = MapTextLight.copy(alpha = 0.8f)) },
-        containerColor = MapDark,
+        title = { Text("Confirm Move", color = ContentLightSecondary) },
+        text = { Text("Are you sure you want to permanently update the coordinates for this station?", color = ContentLightSecondary.copy(alpha = 0.8f)) },
+        containerColor = ContentDark,
         confirmButton = {
             TextButton(onClick = onConfirm) {
-                Text("Confirm", color = MapAccent, fontWeight = FontWeight.Bold)
+                Text("Confirm", color = AccentPink, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
@@ -624,7 +618,7 @@ fun OptimizeRouteButton(
 ) {
     Box(
         modifier = modifier
-            .background(MapDark.copy(alpha = 0.9f), RoundedCornerShape(8.dp))
+            .background(ContentDark.copy(alpha = 0.9f), RoundedCornerShape(8.dp))
             .clickable(enabled = !isOptimizing) { onClick() }
             .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
@@ -632,19 +626,19 @@ fun OptimizeRouteButton(
             if (isOptimizing) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(16.dp),
-                    color = MapLight,
+                    color = ContentLight,
                     strokeWidth = 2.dp
                 )
             } else {
                 Icon(
                     imageVector = Icons.Default.AutoGraph,
                     contentDescription = "Optimize",
-                    tint = MapLight,
+                    tint = ContentLight,
                     modifier = Modifier.size(16.dp)
                 )
             }
             Spacer(modifier = Modifier.width(6.dp))
-            Text("Optimize", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = MapLight)
+            Text("Optimize", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = ContentLight)
         }
     }
 }
@@ -667,7 +661,7 @@ fun EditingPoiOverlay(
                 modifier = Modifier
                     .wrapContentWidth()
                     .shadow(8.dp, RoundedCornerShape(24.dp))
-                    .background(MapDark.copy(alpha = 0.9f), RoundedCornerShape(24.dp))
+                    .background(ContentDark.copy(alpha = 0.9f), RoundedCornerShape(24.dp))
                     .padding(horizontal = 6.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -675,12 +669,12 @@ fun EditingPoiOverlay(
                     onClick = onCancel,
                     modifier = Modifier
                         .size(36.dp)
-                        .background(MapAccent.copy(alpha = 0.15f), CircleShape)
+                        .background(AccentPink.copy(alpha = 0.15f), CircleShape)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Cancel",
-                        tint = MapAccent,
+                        tint = AccentPink,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -717,7 +711,7 @@ fun EditingPoiOverlay(
             Icon(
                 imageVector = Icons.Default.LocationOn, 
                 contentDescription = "Pin", 
-                tint = MapAccent, 
+                tint = AccentPink, 
                 modifier = Modifier.size(48.dp)
             )
         }
@@ -767,7 +761,7 @@ fun ReorderableMapList(
         items(localItems, key = { it.stableId }) { item ->
             ReorderableItem(state, key = item.stableId) { isDragging ->
                 val elevation = animateDpAsState(if (isDragging) 8.dp else 0.dp, label = "elevation")
-                val backgroundColor by animateColorAsState(if (isDragging) MapDark else Color.Transparent, label = "bgColor")
+                val backgroundColor by animateColorAsState(if (isDragging) ContentDark else Color.Transparent, label = "bgColor")
                 
                 val dismissState = rememberSwipeToDismissBoxState(
                     confirmValueChange = { dismissValue ->
@@ -788,7 +782,7 @@ fun ReorderableMapList(
                     enableDismissFromStartToEnd = false,
                     backgroundContent = {
                         if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) {
-                            val iconColor = MapAccent
+                            val iconColor = AccentPink
                             val icon = if (!item.isStation) Icons.Default.Delete else if (item.isHidden) Icons.Default.Visibility else Icons.Default.VisibilityOff
                             val progress = dismissState.progress.coerceIn(0f, 1f)
 
@@ -825,12 +819,12 @@ fun ReorderableMapList(
                                 .height(64.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Box(modifier = Modifier.size(12.dp).background(MapTextLight, CircleShape))
+                            Box(modifier = Modifier.size(12.dp).background(ContentLightSecondary, CircleShape))
                             Spacer(modifier = Modifier.width(12.dp))
                             
                             Text(
                                 text = (localItems.indexOf(item) + 1).toString(),
-                                color = MapTextLight.copy(alpha = if (item.isHidden) 0.5f else 1f),
+                                color = ContentLightSecondary.copy(alpha = if (item.isHidden) 0.5f else 1f),
                                 fontSize = 32.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -838,13 +832,13 @@ fun ReorderableMapList(
                             
                             if (item.isStation) {
                                 val stationIcon = if (item.isHidden) Icons.Default.VisibilityOff else Icons.Default.Train
-                                Icon(stationIcon, contentDescription = null, tint = MapTextLight.copy(alpha = if (item.isHidden) 0.5f else 1f), modifier = Modifier.size(22.dp))
+                                Icon(stationIcon, contentDescription = null, tint = ContentLightSecondary.copy(alpha = if (item.isHidden) 0.5f else 1f), modifier = Modifier.size(22.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
                             }
                             
                             Text(
                                 text = item.name,
-                                color = MapTextLight.copy(alpha = if (item.isHidden) 0.5f else 1f),
+                                color = ContentLightSecondary.copy(alpha = if (item.isHidden) 0.5f else 1f),
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 textDecoration = if (item.isHidden) TextDecoration.LineThrough else TextDecoration.None
@@ -855,11 +849,11 @@ fun ReorderableMapList(
                             Icon(
                                 Icons.Default.EditLocationAlt, 
                                 contentDescription = null, 
-                                tint = MapTextLight, 
+                                tint = ContentLightSecondary, 
                                 modifier = Modifier.size(24.dp).clickable { onStartEditingPoi(item) }
                             )
                         }
-                        HorizontalDivider(color = MapLight.copy(alpha = 0.2f), modifier = Modifier.padding(horizontal = 14.dp))
+                        HorizontalDivider(color = ContentLight.copy(alpha = 0.2f), modifier = Modifier.padding(horizontal = 14.dp))
                     }
                 }
             }
@@ -885,12 +879,12 @@ fun SearchResultsList(
     ) {
         when (val state = searchState) {
             is SearchUiState.Idle -> {
-                item { Text("Type to search...", color = MapTextLight.copy(alpha = 0.5f), modifier = Modifier.padding(16.dp)) }
+                item { Text("Type to search...", color = ContentLightSecondary.copy(alpha = 0.5f), modifier = Modifier.padding(16.dp)) }
             }
             is SearchUiState.Loading -> {
                 item {
                     Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = MapLight)
+                        CircularProgressIndicator(color = ContentLight)
                     }
                 }
             }
@@ -899,7 +893,7 @@ fun SearchResultsList(
             }
             is SearchUiState.Success -> {
                 if (state.results.isEmpty()) {
-                    item { Text("No results found.", color = MapTextLight.copy(alpha = 0.5f), modifier = Modifier.padding(16.dp)) }
+                    item { Text("No results found.", color = ContentLightSecondary.copy(alpha = 0.5f), modifier = Modifier.padding(16.dp)) }
                 } else {
                     items(state.results) { poi ->
                         Row(
@@ -909,16 +903,16 @@ fun SearchResultsList(
                                 .padding(vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.AddLocation, contentDescription = "Add to list", tint = MapTextLight, modifier = Modifier.size(24.dp))
+                            Icon(Icons.Default.AddLocation, contentDescription = "Add to list", tint = ContentLightSecondary, modifier = Modifier.size(24.dp))
                             Spacer(modifier = Modifier.width(16.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(poi.name, color = MapTextLight, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(poi.name, color = ContentLightSecondary, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
 
                                 val cityAddr = listOfNotNull(poi.city, poi.address).joinToString(", ").takeIf { it.isNotBlank() }
                                 if (cityAddr != null) {
                                     Text(
                                         text = cityAddr,
-                                        color = MapTextLight.copy(alpha = 0.7f),
+                                        color = ContentLightSecondary.copy(alpha = 0.7f),
                                         fontSize = 14.sp,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -938,11 +932,11 @@ fun SearchResultsList(
 
                             if (isShortcutMode) {
                                 TextButton(onClick = { onSaveToShortcut(poi) }) {
-                                    Text("+ Save", color = MapAccent, fontWeight = FontWeight.Bold)
+                                    Text("+ Save", color = AccentPink, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
-                        HorizontalDivider(color = MapLight.copy(alpha = 0.1f))
+                        HorizontalDivider(color = ContentLight.copy(alpha = 0.1f))
                     }
                 }
             }
@@ -984,7 +978,7 @@ fun ShortcutsRow(
                 modifier = Modifier
                     .size(width = 80.dp, height = 60.dp)
                     .background(Color.Transparent, RoundedCornerShape(12.dp))
-                    .border(1.dp, MapLight, RoundedCornerShape(12.dp))
+                    .border(1.dp, ContentLight, RoundedCornerShape(12.dp))
                     .clip(RoundedCornerShape(12.dp))
                     .combinedClickable(
                         onClick = { onShortcutClick(shortcut) },
@@ -992,11 +986,11 @@ fun ShortcutsRow(
                     )
                     .padding(4.dp)
             ) {
-                Icon(imageVector = icon, contentDescription = label, tint = MapLight, modifier = Modifier.size(30.dp))
+                Icon(imageVector = icon, contentDescription = label, tint = ContentLight, modifier = Modifier.size(30.dp))
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = label,
-                    color = MapLight,
+                    color = ContentLight,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
@@ -1011,16 +1005,16 @@ fun ShortcutsRow(
                 modifier = Modifier
                     .size(width = 80.dp, height = 60.dp)
                     .background(Color.Transparent, RoundedCornerShape(12.dp))
-                    .border(1.dp, MapLight, RoundedCornerShape(12.dp))
+                    .border(1.dp, ContentLight, RoundedCornerShape(12.dp))
                     .clip(RoundedCornerShape(12.dp))
                     .clickable { onAddNewClick() }
                     .padding(4.dp)
             ) {
-                Icon(imageVector = Icons.Default.Add, contentDescription = "Add New", tint = MapLight, modifier = Modifier.size(30.dp))
+                Icon(imageVector = Icons.Default.Add, contentDescription = "Add New", tint = ContentLight, modifier = Modifier.size(30.dp))
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = "Add new",
-                    color = MapLight,
+                    color = ContentLight,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
