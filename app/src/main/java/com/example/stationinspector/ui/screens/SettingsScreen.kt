@@ -47,10 +47,16 @@ fun SettingsScreen(
     val context = LocalContext.current
 
     // ── CSV import launcher ───────────────────────────────────────────────────
+    // Opening the content stream is the UI layer's job; the ViewModel/use case
+    // only consumes an already-opened InputStream (no Android Context leaks in).
     val csvLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
-        uri?.let { viewModel.importStationsFromCsv(context, it) }
+        uri?.let { selectedUri ->
+            context.contentResolver.openInputStream(selectedUri)?.let { stream ->
+                viewModel.importStationsFromCsv(stream)
+            }
+        }
     }
 
     SettingsScreenContent(

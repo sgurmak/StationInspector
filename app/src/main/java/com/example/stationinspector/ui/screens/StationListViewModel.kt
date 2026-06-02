@@ -1,8 +1,6 @@
 package com.example.stationinspector.ui.screens
 
 import androidx.compose.runtime.Immutable
-import android.content.Context
-import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -12,15 +10,15 @@ import com.example.stationinspector.data.repository.MapyCzRepository
 import com.example.stationinspector.domain.model.Poi
 import com.example.stationinspector.domain.model.PoiLocation
 import com.example.stationinspector.domain.model.Shortcut
-import com.example.stationinspector.domain.model.Station
-import com.example.stationinspector.domain.model.StationStatus
 import com.example.stationinspector.domain.repository.PoiRepository
 import com.example.stationinspector.domain.repository.PreferencesRepository
 import com.example.stationinspector.domain.repository.RouteRepository
 import com.example.stationinspector.domain.repository.ShortcutRepository
 import com.example.stationinspector.domain.repository.StationRepository
+import com.example.stationinspector.domain.usecase.ImportStationsUseCase
 import com.example.stationinspector.utils.PolylineUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.io.InputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -45,11 +43,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ensureActive
 import org.osmdroid.util.GeoPoint
-import java.io.BufferedReader
-import java.io.InputStreamReader
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.time.format.DateTimeParseException
 import javax.inject.Inject
 import com.example.stationinspector.data.local.AppDatabase
 import androidx.room.withTransaction
@@ -146,6 +140,7 @@ class StationListViewModel @Inject constructor(
     private val shortcutRepository: ShortcutRepository,
     private val poiRepository: PoiRepository,
     private val preferencesRepository: PreferencesRepository,
+    private val importStationsUseCase: ImportStationsUseCase,
     private val stationDao: StationDao,
     private val database: AppDatabase
 ) : ViewModel() {
@@ -829,105 +824,25 @@ class StationListViewModel @Inject constructor(
         }
     }
 
-    private fun cleanStationName(rawName: String): String {
-        var name = rawName
-        var parentheses = ""
-
-        // Step 1: Extract and protect parenthetical suffixes (e.g. "(zastávka)")
-        val parenRegex = "\\((.*?)\\)".toRegex()
-        val parenMatch = parenRegex.find(name)
-        if (parenMatch != null) {
-            parentheses = parenMatch.value
-            name = name.replace(parenMatch.value, "")
-        }
-
-        // Step 2: Strip domain-specific abbreviations
-        name = name.replace("žst.", "").replace("os.n.", "")
-
-        // Step 3: Truncate at the first dash separator (" - " or "- ")
-        val dashSpaceIndex = name.indexOf("- ")
-        val spaceDashSpaceIndex = name.indexOf(" - ")
-
-        val cutIndex = when {
-            dashSpaceIndex != -1 && spaceDashSpaceIndex != -1 -> minOf(dashSpaceIndex, spaceDashSpaceIndex)
-            dashSpaceIndex != -1 -> dashSpaceIndex
-            spaceDashSpaceIndex != -1 -> spaceDashSpaceIndex
-            else -> -1
-        }
-
-        if (cutIndex != -1) {
-            name = name.substring(0, cutIndex)
-        }
-
-        // Step 4: Re-attach parentheses; collapse whitespace
-        if (parentheses.isNotEmpty()) {
-            name = "$name $parentheses"
-        }
-
-        return name.replace("\\s+".toRegex(), " ").trim()
-    }
-
     // ── CSV import ─────────────────────────────────────────────────────────────
-    fun importStationsFromCsv(context: Context, uri: Uri) {
+    /**
+     * Imports stations from an already-opened CSV [InputStream]. Opening the
+     * stream from a content `Uri` is the UI layer's responsibility, so this
+     * ViewModel stays free of Android `Context`.
+     */
+    fun importStationsFromCsv(inputStream: InputStream) {
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                withContext(Dispatchers.IO) {
-                    context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                        val reader = BufferedReader(
-                            InputStreamReader(inputStream, Charsets.UTF_8)
-                        )
-                        val dateFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
-
-                        val rawStations = mutableListOf<Station>()
-
-                        reader.lineSequence().forEach { rawLine ->
-                            val line = rawLine.trim()
-                            if (line.isBlank()) return@forEach
-
-                            val parts = if (line.contains(';')) line.split(';')
-                            else line.split(',')
-
-                            if (parts.size < 2) return@forEach
-
-                            val name    = parts[0].trim()
-                            val dateStr = parts[1].trim()
-                            if (name.isBlank() || dateStr.isBlank()) return@forEach
-
-                            val date = try {
-                                LocalDate.parse(dateStr, dateFormatter)
-                            } catch (e: DateTimeParseException) { null }
-
-                            val cleanedName = cleanStationName(name)
-
-                            rawStations.add(
-                                Station(
-                                    id             = 0,
-                                    name           = cleanedName,
-                                    address        = "",
-                                    inspectionDate = date,
-                                    status         = StationStatus.PENDING
-                                )
+                importStationsUseCase(inputStream)
+                    .onFailure { e ->
+                        Log.e(TAG, "CSV import failed", e)
+                        _uiEvent.emit(
+                            UiEvent.ShowSnackbar(
+                                "Import failed: ${e.localizedMessage ?: "Unknown error"}"
                             )
-                        }
-
-                        // Deduplication: ensure only one unique entry per physical station is saved
-                        val uniqueStations = rawStations.distinctBy { it.name }
-
-                        uniqueStations.forEach { station ->
-                            try {
-                                stationRepository.saveStation(station)
-                            } catch (e: Exception) {
-                                Log.e(TAG, "Failed to save station '${station.name}' during CSV import", e)
-                            }
-                        }
-
-                        stationRepository.seedCoordinatesIfMissing()
+                        )
                     }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "CSV import failed", e)
-                _uiEvent.emit(UiEvent.ShowSnackbar("Import failed: ${e.localizedMessage ?: "Unknown error"}"))
             } finally {
                 _isLoading.value = false
             }

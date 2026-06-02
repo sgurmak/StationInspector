@@ -52,6 +52,13 @@ android {
         compose = true
         buildConfig = true
     }
+    testOptions {
+        unitTests {
+            // Return default values (0/null/false) for un-mocked android.* calls
+            // such as android.util.Log, so pure-logic unit tests don't crash.
+            isReturnDefaultValues = true
+        }
+    }
 }
 
 dependencies {
