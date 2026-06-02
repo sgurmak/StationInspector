@@ -4,7 +4,7 @@ import java.time.LocalDate
 
 /**
  * Domain model carrying a Station plus its pre-computed photo split counts.
- * Used by StationListViewModel to display per-station counters without
+ * Used by RouteViewModel to display per-station counters without
  * issuing separate queries per station.
  */
 data class StationWithSplitCountsDomain(

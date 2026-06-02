@@ -58,6 +58,20 @@ class StationRepositoryImpl @Inject constructor(
         stationDao.updateStationCoordinates(stationId, lat, lon)
     }
 
+    override suspend fun getStationsForDateSync(date: java.time.LocalDate): List<Station> {
+        return stationDao.getAllStationsSync()
+            .filter { it.inspectionDate == date }
+            .map { it.toDomain() }
+    }
+
+    override suspend fun updateStationOrder(stationId: Long, orderIndex: Int) {
+        stationDao.updateStationOrder(stationId, orderIndex)
+    }
+
+    override suspend fun updateStationOrders(orders: List<Pair<Long, Int>>) {
+        stationDao.updateStationOrders(orders)
+    }
+
     override suspend fun deleteStation(station: Station) {
         stationDao.deleteStation(station.toEntity())
     }

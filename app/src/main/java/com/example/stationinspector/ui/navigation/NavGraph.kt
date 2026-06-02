@@ -14,7 +14,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.example.stationinspector.ui.screens.StationListViewModel
+import com.example.stationinspector.ui.screens.RouteViewModel
 import com.example.stationinspector.ui.export.ExportScreen
 import com.example.stationinspector.ui.screens.MainAppScreen
 import com.example.stationinspector.ui.inspection.CameraScreen
@@ -47,7 +47,7 @@ fun StationInspectorNavGraph(
             // MainAppScreen owns the Scaffold, gradient background, and BottomNavBar.
             // It receives navigation callbacks and forwards them to child screens.
             val context = LocalContext.current
-            val vm: StationListViewModel = hiltViewModel()
+            val vm: RouteViewModel = hiltViewModel()
 
             // Show success banner when returning from GalleryScreen confirm.
             val bannerResult by backStackEntry.savedStateHandle

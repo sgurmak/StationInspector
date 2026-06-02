@@ -14,6 +14,11 @@ interface StationRepository {
     suspend fun deleteStation(station: Station)
     suspend fun clearAllData()
 
+    /** Synchronous one-shot read of all stations scheduled for [date]. */
+    suspend fun getStationsForDateSync(date: java.time.LocalDate): List<Station>
+    suspend fun updateStationOrder(stationId: Long, orderIndex: Int)
+    suspend fun updateStationOrders(orders: List<Pair<Long, Int>>)
+
     suspend fun seedCoordinatesIfMissing()
 
     fun getPhotosForStation(stationId: Long): Flow<List<Photo>>

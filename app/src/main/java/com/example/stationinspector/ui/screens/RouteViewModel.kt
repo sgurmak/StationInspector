@@ -1,154 +1,67 @@
 package com.example.stationinspector.ui.screens
 
-import androidx.compose.runtime.Immutable
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.stationinspector.data.local.dao.StationDao
-import com.example.stationinspector.data.local.entity.ShortcutEntity
-import com.example.stationinspector.data.repository.MapyCzRepository
+import androidx.room.withTransaction
+import com.example.stationinspector.data.local.AppDatabase
 import com.example.stationinspector.domain.model.Poi
-import com.example.stationinspector.domain.model.PoiLocation
 import com.example.stationinspector.domain.model.Shortcut
 import com.example.stationinspector.domain.repository.PoiRepository
 import com.example.stationinspector.domain.repository.PreferencesRepository
 import com.example.stationinspector.domain.repository.RouteRepository
 import com.example.stationinspector.domain.repository.ShortcutRepository
 import com.example.stationinspector.domain.repository.StationRepository
-import com.example.stationinspector.domain.usecase.ImportStationsUseCase
 import com.example.stationinspector.utils.PolylineUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
-import java.io.InputStream
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.ensureActive
 import org.osmdroid.util.GeoPoint
 import java.time.LocalDate
+import java.util.UUID
 import javax.inject.Inject
-import com.example.stationinspector.data.local.AppDatabase
-import androidx.room.withTransaction
 
-// ── UI model ───────────────────────────────────────────────────────────────────
-
-sealed interface RouteListItem {
-    val stableId: String
-    val id: String
-    val name: String
-    val latitude: Double
-    val longitude: Double
-    val isStation: Boolean
-    val isHidden: Boolean
-    val orderIndex: Int
-}
-
-data class StationItem(
-    val station: StationWithCounts,
-    override val isHidden: Boolean = false,
-    override val orderIndex: Int = 0
-) : RouteListItem {
-    override val stableId: String get() = "station_${station.id}"
-    override val id: String get() = station.id
-    override val name: String get() = station.name
-    override val latitude: Double get() = station.latitude
-    override val longitude: Double get() = station.longitude
-    override val isStation: Boolean = true
-}
-
-data class PoiItem(
-    override val id: String,
-    override val name: String,
-    val city: String?,
-    val address: String?,
-    val region: String?,
-    override val latitude: Double,
-    override val longitude: Double,
-    override val isHidden: Boolean = false,
-    val uniqueId: String? = null,
-    override val orderIndex: Int = 0
-) : RouteListItem {
-    override val stableId: String get() = "poi_${uniqueId ?: id}"
-    override val isStation: Boolean = false
-}
-
-data class StationWithCounts(
-    val id: String,
-    val name: String,
-    val latitude: Double,
-    val longitude: Double,
-    /** CLIENT_REPORT photos */
-    val photoCount: Int,
-    /** INTERNAL_DEFECT photos */
-    val issueCount: Int
-)
-
-@Immutable
-data class DailyRouteInfo(
-    val totalDistanceKm: Double,
-    val totalTimeMins: Int,
-    val waypointCount: Int,
-    val polylinePoints: List<GeoPoint>
-) {
-    val formattedDuration: String
-        get() = if (totalTimeMins >= 60) "${totalTimeMins / 60}h ${totalTimeMins % 60}min" else "${totalTimeMins}min"
-}
-
-@Immutable
-data class ShortcutUiModel(
-    val id: String,
-    val label: String,
-    val customName: String?,
-    val poiItem: PoiItem?,
-    val isNew: Boolean,
-    val isRoundTrip: Boolean,
-    val entity: ShortcutEntity
-)
-
-sealed interface SearchUiState {
-    data object Idle    : SearchUiState
-    data object Loading : SearchUiState
-    data class Success(val results: List<PoiItem>) : SearchUiState
-    data class Error(val message: String)          : SearchUiState
-}
-
-// ── ViewModel ──────────────────────────────────────────────────────────────────
-
+/**
+ * Owns the daily route: selected date, the route item list, route info
+ * (distance/time/polyline), editing/optimize/reorder, Home & round-trip logic,
+ * map-expanded preference, and list scroll persistence.
+ *
+ * This is the primary cross-tab ViewModel shared between the Work
+ * (StationListScreen) and Map (MapScreen) tabs — both resolve the same instance
+ * because they share the NavBackStackEntry ViewModelStoreOwner.
+ */
 @HiltViewModel
-class StationListViewModel @Inject constructor(
+class RouteViewModel @Inject constructor(
     private val stationRepository: StationRepository,
     private val routeRepository: RouteRepository,
-    private val mapyCzRepository: MapyCzRepository,
-    private val shortcutRepository: ShortcutRepository,
     private val poiRepository: PoiRepository,
     private val preferencesRepository: PreferencesRepository,
-    private val importStationsUseCase: ImportStationsUseCase,
-    private val stationDao: StationDao,
+    private val shortcutRepository: ShortcutRepository,
     private val database: AppDatabase
 ) : ViewModel() {
 
-    companion object {
-        private const val SHORTCUT_ID_HOME = Shortcut.ID_HOME
-        private const val SHORTCUT_ID_WORK = Shortcut.ID_WORK
-        private const val TAG = "StationListViewModel"
+    private companion object {
+        const val TAG = "RouteViewModel"
+        const val NAME_HOME = "Home"
+        const val NAME_WORK = "Work"
     }
 
     val isRoundTripEnabled: StateFlow<Boolean> = preferencesRepository.isRoundTripEnabled
@@ -166,29 +79,20 @@ class StationListViewModel @Inject constructor(
         }
     }
 
-    val shortcuts: StateFlow<List<ShortcutUiModel>> = shortcutRepository.observeShortcuts()
-        .map { domainList -> domainList.map { it.toUiModel() } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
     // ── Selected date ──────────────────────────────────────────────────────────
     private val _selectedDate = MutableStateFlow<LocalDate?>(null)
     val selectedDate: StateFlow<LocalDate?> = _selectedDate.asStateFlow()
 
-    // ── Available dates derived from the DB ────────────────────────────────────
     private val _availableDates = MutableStateFlow<List<LocalDate>>(emptyList())
     val availableDates: StateFlow<List<LocalDate>> = _availableDates.asStateFlow()
 
     private val _hiddenIds = MutableStateFlow<Set<String>>(emptySet())
 
     // ── Route items — date-atomic flow ────────────────────────────────────────
-    //
-    // combine() is nested inside flatMapLatest so that when the date changes,
-    // flatMapLatest atomically cancels the previous (stations + pois + hiddenIds)
-    // subscription before starting a new one.  This prevents a stale-pois
-    // double-emission that top-level combine() would produce on date switches.
-    //
-    // Pairing each emission with its date lets the Screen use the date as a
-    // Compose key() that is always coherent with the emitted list contents.
+    // combine() nested in flatMapLatest so a date change atomically cancels the
+    // previous (stations + pois + hiddenIds) subscription before the new one,
+    // avoiding a stale-pois double emission. The date is paired with the list so
+    // the screen can use it as a coherent Compose key().
     @OptIn(ExperimentalCoroutinesApi::class)
     private val _routeStateFlow: StateFlow<Pair<LocalDate?, List<RouteListItem>>> =
         _selectedDate
@@ -239,9 +143,6 @@ class StationListViewModel @Inject constructor(
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null to emptyList())
 
-    // Public projections of _routeStateFlow.  Both update in the same emission,
-    // so stableRouteDate is always consistent with routeItems and safe to use
-    // as a Compose key() in the list host.
     val routeItems: StateFlow<List<RouteListItem>> = _routeStateFlow
         .map { (_, items) -> items }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -256,21 +157,11 @@ class StationListViewModel @Inject constructor(
     private val _routeInfo = MutableStateFlow(DailyRouteInfo(0.0, 0, 0, emptyList()))
     val routeInfo: StateFlow<DailyRouteInfo> = _routeInfo.asStateFlow()
 
-    // ── Search State ───────────────────────────────────────────────────────────
-    private val _searchQuery = MutableStateFlow("")
-    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
-
-    fun onSearchQueryChanged(query: String) { _searchQuery.value = query }
-
     private val _editingPoi = MutableStateFlow<RouteListItem?>(null)
     val editingPoi: StateFlow<RouteListItem?> = _editingPoi.asStateFlow()
 
     private val _isOptimizing = MutableStateFlow(false)
     val isOptimizing: StateFlow<Boolean> = _isOptimizing.asStateFlow()
-
-    sealed interface UiEvent {
-        data class ShowSnackbar(val message: String) : UiEvent
-    }
 
     private val _uiEvent = MutableSharedFlow<UiEvent>()
     val uiEvent = _uiEvent.asSharedFlow()
@@ -278,7 +169,7 @@ class StationListViewModel @Inject constructor(
     fun optimizeRoute() {
         val activeItems = routeItems.value.filter { !it.isHidden }
         val validItems = activeItems.filter { it.latitude != 0.0 && it.longitude != 0.0 }
-        
+
         if (validItems.size < 3) {
             viewModelScope.launch {
                 _uiEvent.emit(UiEvent.ShowSnackbar("At least 3 valid locations required to optimize"))
@@ -306,19 +197,16 @@ class StationListViewModel @Inject constructor(
                         }
                     }
 
-                    stationDao.updateStationOrders(stationOrders)
+                    stationRepository.updateStationOrders(stationOrders)
                     poiRepository.updateOrders(poiOrders)
                 }.onFailure { e ->
-                    // API/network rejection — expected failure path.
                     Log.w(TAG, "Route optimization returned a failure result", e)
                     _uiEvent.emit(UiEvent.ShowSnackbar(e.message ?: "Optimization failed"))
                 }
             } catch (e: Exception) {
-                // Unexpected DB or runtime failure after a successful API call.
                 Log.e(TAG, "Unexpected error during route optimization", e)
                 _uiEvent.emit(UiEvent.ShowSnackbar("Optimization failed unexpectedly"))
             } finally {
-                // Always release the lock — even if an exception was thrown above.
                 _isOptimizing.value = false
             }
         }
@@ -330,17 +218,12 @@ class StationListViewModel @Inject constructor(
         }
     }
 
-    fun startEditingPoi(poi: RouteListItem) {
-        _editingPoi.value = poi
-    }
+    fun startEditingPoi(poi: RouteListItem) { _editingPoi.value = poi }
 
-    fun cancelEditingPoi() {
-        _editingPoi.value = null
-    }
+    fun cancelEditingPoi() { _editingPoi.value = null }
 
     fun saveEditedPoi(poi: RouteListItem, lat: Double, lon: Double) {
         viewModelScope.launch(Dispatchers.IO) {
-            // Capture date before entering the background thread; bail if unset.
             val date = _selectedDate.value ?: run {
                 Log.w(TAG, "saveEditedPoi called with no selected date — aborting write")
                 return@launch
@@ -349,8 +232,7 @@ class StationListViewModel @Inject constructor(
                 if (poi is StationItem) {
                     stationRepository.updateStationCoordinates(poi.id.toLong(), lat, lon)
                 } else if (poi is PoiItem) {
-                    // Propagate the new coordinates to any shortcut that points
-                    // at this POI so the saved Home/Work pin moves too.
+                    // Propagate the new coordinates to any shortcut bound to this POI.
                     val currentShortcuts = shortcutRepository.observeShortcuts().first()
                     currentShortcuts.forEach { shortcut ->
                         val location = shortcut.location
@@ -381,32 +263,9 @@ class StationListViewModel @Inject constructor(
                 Log.e(TAG, "Failed to save edited coordinates for '${poi.name}'", e)
             }
         }
-        // Dialog is dismissed immediately; the DB write continues in the background.
         _editingPoi.value = null
     }
 
-    @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
-    val searchState: StateFlow<SearchUiState> = _searchQuery
-        .debounce(300L)
-        .transformLatest { query ->
-            if (query.isBlank()) {
-                emit(SearchUiState.Idle)
-            } else {
-                emit(SearchUiState.Loading)
-                try {
-                    val results = mapyCzRepository.searchLocation(query)
-                    emit(SearchUiState.Success(results))
-                } catch (e: Exception) {
-                    emit(SearchUiState.Error(e.localizedMessage ?: "Unknown error"))
-                }
-            }
-        }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = SearchUiState.Idle
-        )
-        
     fun addPoiToRoute(poi: PoiItem) {
         val date = _selectedDate.value ?: return
         viewModelScope.launch(Dispatchers.IO) {
@@ -414,19 +273,18 @@ class StationListViewModel @Inject constructor(
                 insertPoiAtCorrectOrderIndex(poi, date)
             }
         }
-        _searchQuery.value = ""
     }
 
     fun addShortcutToRoute(shortcutId: String, poi: PoiItem) {
         val date = _selectedDate.value ?: return
         viewModelScope.launch(Dispatchers.IO) {
             val finalPoi = when (shortcutId) {
-                SHORTCUT_ID_HOME -> poi.copy(name = "Home")
-                SHORTCUT_ID_WORK -> poi.copy(name = "Work")
+                Shortcut.ID_HOME -> poi.copy(name = NAME_HOME)
+                Shortcut.ID_WORK -> poi.copy(name = NAME_WORK)
                 else             -> poi
             }
 
-            if (shortcutId == SHORTCUT_ID_HOME) {
+            if (shortcutId == Shortcut.ID_HOME) {
                 rebuildHomePointsAndIndices(date, isRoundTripEnabled.value, finalPoi)
             } else {
                 database.withTransaction {
@@ -434,14 +292,13 @@ class StationListViewModel @Inject constructor(
                 }
             }
         }
-        _searchQuery.value = ""
     }
 
     private suspend fun insertPoiAtCorrectOrderIndex(poi: PoiItem, date: LocalDate) {
         val currentItems = routeItems.value
         val lastItem = currentItems.lastOrNull()
         val isRoundTrip = isRoundTripEnabled.value
-        if (isRoundTrip && lastItem != null && lastItem.name == "Home" && lastItem is PoiItem) {
+        if (isRoundTrip && lastItem != null && lastItem.name == NAME_HOME && lastItem is PoiItem) {
             val targetOrderIndex = lastItem.orderIndex
             poiRepository.insertPoi(
                 poi.toDomainAt(date = date, orderIndex = targetOrderIndex, freshId = true)
@@ -462,10 +319,10 @@ class StationListViewModel @Inject constructor(
         clearHome: Boolean = false
     ) {
         database.withTransaction {
-            val stations = stationDao.getAllStationsSync().filter { it.inspectionDate == date }
+            val stations = stationRepository.getStationsForDateSync(date)
             val pois = poiRepository.getPoisForDate(date)
 
-            val existingHome = if (clearHome) null else pois.firstOrNull { it.name == "Home" }
+            val existingHome = if (clearHome) null else pois.firstOrNull { it.name == NAME_HOME }
             val homePoi = newHomePoi ?: existingHome?.let {
                 PoiItem(
                     id = it.id,
@@ -478,10 +335,10 @@ class StationListViewModel @Inject constructor(
                 )
             }
 
-            poiRepository.deletePoisByNameAndDate("Home", date)
-            
+            poiRepository.deletePoisByNameAndDate(NAME_HOME, date)
+
             if (homePoi != null) {
-                val nonHomePois = pois.filter { it.name != "Home" }
+                val nonHomePois = pois.filter { it.name != NAME_HOME }
                 val nonHomeItems = (stations.map {
                     StationItem(
                         station = StationWithCounts(
@@ -506,10 +363,10 @@ class StationListViewModel @Inject constructor(
                         orderIndex = it.orderIndex
                     )
                 }).sortedBy { it.orderIndex }
-                
+
                 val startPoi = Poi(
-                    id = homePoi.id.takeIf { it.isNotBlank() && it != "NEW" } ?: java.util.UUID.randomUUID().toString(),
-                    name = "Home",
+                    id = homePoi.id.takeIf { it.isNotBlank() && it != "NEW" } ?: UUID.randomUUID().toString(),
+                    name = NAME_HOME,
                     city = homePoi.city,
                     address = homePoi.address,
                     region = homePoi.region,
@@ -523,15 +380,15 @@ class StationListViewModel @Inject constructor(
                 nonHomeItems.forEachIndexed { idx, item ->
                     val newIdx = idx + 1
                     when (item) {
-                        is StationItem -> stationDao.updateStationOrder(item.station.id.toLong(), newIdx)
+                        is StationItem -> stationRepository.updateStationOrder(item.station.id.toLong(), newIdx)
                         is PoiItem -> poiRepository.updateOrder(item.id, newIdx)
                     }
                 }
 
                 if (isRoundTrip) {
                     val endPoi = Poi(
-                        id = java.util.UUID.randomUUID().toString(),
-                        name = "Home",
+                        id = UUID.randomUUID().toString(),
+                        name = NAME_HOME,
                         city = homePoi.city,
                         address = homePoi.address,
                         region = homePoi.region,
@@ -543,7 +400,7 @@ class StationListViewModel @Inject constructor(
                     poiRepository.insertPoi(endPoi)
                 }
             } else {
-                val remainingPois = pois.filter { it.name != "Home" }
+                val remainingPois = pois.filter { it.name != NAME_HOME }
                 val remainingItems = (stations.map {
                     StationItem(
                         station = StationWithCounts(
@@ -568,10 +425,10 @@ class StationListViewModel @Inject constructor(
                         orderIndex = it.orderIndex
                     )
                 }).sortedBy { it.orderIndex }
-                
+
                 remainingItems.forEachIndexed { idx, item ->
                     when (item) {
-                        is StationItem -> stationDao.updateStationOrder(item.station.id.toLong(), idx)
+                        is StationItem -> stationRepository.updateStationOrder(item.station.id.toLong(), idx)
                         is PoiItem -> poiRepository.updateOrder(item.id, idx)
                     }
                 }
@@ -580,22 +437,21 @@ class StationListViewModel @Inject constructor(
     }
 
     /**
-     * Persists the visual drag-and-drop order back to the database so that
-     * the next Room emission reflects the user's reordering rather than
-     * reverting to the previous order.
+     * Persists the visual drag-and-drop order back to the database so the next
+     * Room emission reflects the reordering rather than reverting.
      */
     fun reorderItems(items: List<RouteListItem>) {
         viewModelScope.launch(Dispatchers.IO) {
             database.withTransaction {
                 val isRoundTrip = isRoundTripEnabled.value
-                val hasHome = items.any { it.name == "Home" }
-                
+                val hasHome = items.any { it.name == NAME_HOME }
+
                 val adjustedList = if (hasHome) {
-                    val homePoints = items.filter { it.name == "Home" }
+                    val homePoints = items.filter { it.name == NAME_HOME }
                     val startHome = homePoints.first()
                     val endHome = if (homePoints.size >= 2) homePoints.last() else null
-                    val middleItems = items.filter { it.name != "Home" }
-                    
+                    val middleItems = items.filter { it.name != NAME_HOME }
+
                     val result = mutableListOf<RouteListItem>()
                     result.add(startHome)
                     result.addAll(middleItems)
@@ -609,15 +465,15 @@ class StationListViewModel @Inject constructor(
 
                 val stationOrders = mutableListOf<Pair<Long, Int>>()
                 val poiOrders     = mutableListOf<Pair<String, Int>>()
-                
+
                 adjustedList.forEachIndexed { index, item ->
                     when (item) {
                         is StationItem -> stationOrders.add(item.station.id.toLong() to index)
                         is PoiItem     -> poiOrders.add(item.id to index)
                     }
                 }
-                
-                if (stationOrders.isNotEmpty()) stationDao.updateStationOrders(stationOrders)
+
+                if (stationOrders.isNotEmpty()) stationRepository.updateStationOrders(stationOrders)
                 if (poiOrders.isNotEmpty())     poiRepository.updateOrders(poiOrders)
             }
         }
@@ -632,7 +488,7 @@ class StationListViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             val pois = poiRepository.getPoisForDate(date)
             val poiToDelete = pois.firstOrNull { it.id == id }
-            if (poiToDelete != null && poiToDelete.name == "Home") {
+            if (poiToDelete != null && poiToDelete.name == NAME_HOME) {
                 rebuildHomePointsAndIndices(date, false, null, clearHome = true)
             } else {
                 poiRepository.deletePoi(id)
@@ -641,57 +497,21 @@ class StationListViewModel @Inject constructor(
         }
     }
 
-    fun updateShortcut(id: String, poi: PoiItem?, customName: String?) {
-        viewModelScope.launch(Dispatchers.IO) {
-            shortcutRepository.updateShortcut(
-                id = id,
-                location = poi?.toPoiLocation(),
-                customName = customName,
-                isNew = poi == null
-            )
-        }
-    }
-
-    fun createNewShortcut(poi: PoiItem?, customName: String?) {
-        viewModelScope.launch(Dispatchers.IO) {
-            shortcutRepository.insertPreset(poi?.toPoiLocation(), customName)
-        }
-    }
-
-    fun deleteShortcut(id: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            if (id == SHORTCUT_ID_HOME || id == SHORTCUT_ID_WORK) {
-                // Keep Home and Work entries — just clear their bound location.
-                shortcutRepository.updateShortcut(id, location = null, customName = null, isNew = true)
-            } else {
-                shortcutRepository.deleteShortcut(id)
-            }
-        }
-    }
-
-    // ── Scroll-position persistence ───────────────────────────────────────────
-    // In-memory map keyed by date; survives tab switches and back-navigation.
-    // Cleared only on ViewModel destruction (process death / low-memory kill).
+    // ── Scroll-position persistence (in-memory, keyed by date) ──────────────────
     private val _scrollPositionByDate = mutableMapOf<LocalDate, Pair<Int, Int>>()
 
-    /** Persist the scroll position for a specific date. */
     fun saveScrollPositionForDate(date: LocalDate, index: Int, offset: Int) {
         if (index > 0 || offset > 0) {
             _scrollPositionByDate[date] = index to offset
         } else {
-            // Position 0 is the default — no need to store it explicitly.
             _scrollPositionByDate.remove(date)
         }
     }
 
-    /** Returns the saved (index, scrollOffset) pair for [date], or (0, 0) if none. */
     fun getScrollPositionForDate(date: LocalDate?): Pair<Int, Int> =
         date?.let { _scrollPositionByDate[it] } ?: (0 to 0)
 
-    // ── Loading / busy flag ────────────────────────────────────────────────────
-    private val _isLoading = MutableStateFlow(false)
-    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
-
+    // ── Map expanded preference (per date) ──────────────────────────────────────
     private val _mapExpandedByDate = MutableStateFlow<Map<LocalDate, Boolean>>(emptyMap())
     val mapExpandedByDate: StateFlow<Map<LocalDate, Boolean>> = _mapExpandedByDate.asStateFlow()
 
@@ -704,12 +524,9 @@ class StationListViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
-                shortcutRepository.clearOldBlankShortcuts()
-                shortcutRepository.ensureDefaults()
                 stationRepository.seedCoordinatesIfMissing()
             }
-            // Uses the JOIN query so photo/issue counts stay in sync with
-            // the photos table; Room re-emits on any change to either table.
+            // JOIN query keeps photo/issue counts in sync; Room re-emits on change.
             stationRepository.getAllStationsWithSplitCounts().collect { rows ->
                 val dates = rows
                     .mapNotNull { it.inspectionDate }
@@ -731,11 +548,13 @@ class StationListViewModel @Inject constructor(
                 }
             }
         }
-        
+
         viewModelScope.launch {
             routeItems.collectLatest { items ->
                 calculateDailyRoute(items)
-                _isExportButtonEnabled.value = items.filterIsInstance<StationItem>().sumOf { it.station.photoCount + it.station.issueCount } > 0
+                _isExportButtonEnabled.value =
+                    items.filterIsInstance<StationItem>()
+                        .sumOf { it.station.photoCount + it.station.issueCount } > 0
             }
         }
     }
@@ -743,20 +562,6 @@ class StationListViewModel @Inject constructor(
     fun onDateSelected(date: LocalDate) {
         _selectedDate.value = date
     }
-
-    // ── Clear all data ─────────────────────────────────────────────────────────
-    fun clearAllData() {
-        viewModelScope.launch {
-            _isLoading.value = true
-            try {
-                withContext(Dispatchers.IO) { stationRepository.clearAllData() }
-            } finally {
-                _isLoading.value = false
-            }
-        }
-    }
-
-    // ── Internal helpers ───────────────────────────────────────────────────────
 
     private suspend fun calculateDailyRoute(dailyItems: List<RouteListItem>) {
         withContext(Dispatchers.IO) {
@@ -812,98 +617,12 @@ class StationListViewModel @Inject constructor(
                 }
             }
 
-            val totalDistanceKm = totalDistance / 1000.0
-            val totalTimeMins = (totalTime / 60).toInt()
-
             _routeInfo.value = DailyRouteInfo(
-                totalDistanceKm = totalDistanceKm,
-                totalTimeMins = totalTimeMins,
-                waypointCount = validItems.count { it.name != "Home" },
+                totalDistanceKm = totalDistance / 1000.0,
+                totalTimeMins = (totalTime / 60).toInt(),
+                waypointCount = validItems.count { it.name != NAME_HOME },
                 polylinePoints = polylinePoints.toList()
             )
         }
     }
-
-    // ── CSV import ─────────────────────────────────────────────────────────────
-    /**
-     * Imports stations from an already-opened CSV [InputStream]. Opening the
-     * stream from a content `Uri` is the UI layer's responsibility, so this
-     * ViewModel stays free of Android `Context`.
-     */
-    fun importStationsFromCsv(inputStream: InputStream) {
-        viewModelScope.launch {
-            _isLoading.value = true
-            try {
-                importStationsUseCase(inputStream)
-                    .onFailure { e ->
-                        Log.e(TAG, "CSV import failed", e)
-                        _uiEvent.emit(
-                            UiEvent.ShowSnackbar(
-                                "Import failed: ${e.localizedMessage ?: "Unknown error"}"
-                            )
-                        )
-                    }
-            } finally {
-                _isLoading.value = false
-            }
-        }
-    }
 }
-
-// ── UI ↔ domain mappers (private to this file) ─────────────────────────────────
-
-private fun Shortcut.toUiModel(): ShortcutUiModel = ShortcutUiModel(
-    id          = id,
-    label       = label,
-    customName  = customName,
-    poiItem     = location?.toPoiItem(),
-    isNew       = isNew,
-    isRoundTrip = isRoundTrip,
-    // Synthesized for source compatibility with existing previews.
-    // The `entity` field on ShortcutUiModel is no longer the canonical
-    // source — repository is. Slated for removal in a later UI cleanup.
-    entity      = ShortcutEntity(
-        id          = id,
-        label       = label,
-        customName  = customName,
-        poiItemJson = null,
-        isNew       = isNew,
-        isRoundTrip = isRoundTrip
-    )
-)
-
-private fun PoiLocation.toPoiItem(): PoiItem = PoiItem(
-    id        = id,
-    name      = name,
-    city      = city,
-    address   = address,
-    region    = region,
-    latitude  = latitude,
-    longitude = longitude
-)
-
-private fun PoiItem.toPoiLocation(): PoiLocation = PoiLocation(
-    id        = id,
-    name      = name,
-    city      = city,
-    address   = address,
-    region    = region,
-    latitude  = latitude,
-    longitude = longitude
-)
-
-/**
- * Build a [Poi] domain object from a [PoiItem] for a given date/order, optionally
- * forcing a fresh UUID when a new POI row is being inserted into the route.
- */
-private fun PoiItem.toDomainAt(date: LocalDate, orderIndex: Int, freshId: Boolean): Poi = Poi(
-    id             = if (freshId) java.util.UUID.randomUUID().toString() else id,
-    name           = name,
-    city           = city,
-    address        = address,
-    region         = region,
-    latitude       = latitude,
-    longitude      = longitude,
-    inspectionDate = date,
-    orderIndex     = orderIndex
-)

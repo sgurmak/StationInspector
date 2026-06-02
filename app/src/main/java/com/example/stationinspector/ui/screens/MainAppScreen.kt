@@ -26,8 +26,13 @@ fun MainAppScreen(
     onStationClick:  (String, Int) -> Unit,
     onNavigateToPoi: (Double, Double, String) -> Unit = { _, _, _ -> }
 ) {
-    val sharedViewModel: StationListViewModel = androidx.hilt.navigation.compose.hiltViewModel()
-    val selectedDate by sharedViewModel.selectedDate.collectAsState()
+    // RouteViewModel owns the selected date; the Export tab needs it for its
+    // route argument. Child screens resolve their own ViewModels via
+    // hiltViewModel(); because they share this NavBackStackEntry's
+    // ViewModelStoreOwner, StationListScreen and MapScreen receive the SAME
+    // RouteViewModel instance, preserving cross-tab route/date state.
+    val routeViewModel: RouteViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+    val selectedDate by routeViewModel.selectedDate.collectAsState()
     // rememberSaveable so the selected tab survives process death / config change.
     // MainTab is an enum (Serializable), so no custom Saver is required.
     var currentTab by rememberSaveable { mutableStateOf(MainTab.STATION_LIST) }
@@ -53,7 +58,6 @@ fun MainAppScreen(
             when (currentTab) {
                 // ── Tab: Work / Station List ──────────────────────────────────
                 MainTab.STATION_LIST -> StationListScreen(
-                    viewModel       = sharedViewModel,
                     onStationClick  = onStationClick,
                     onNavigateToPoi = onNavigateToPoi,
                     onNavigateToMap = { currentTab = MainTab.MAP },
@@ -62,7 +66,6 @@ fun MainAppScreen(
 
                 // ── Tab: Map ──────────────────────────────────────────────────
                 MainTab.MAP -> MapScreen(
-                    viewModel      = sharedViewModel,
                     contentPadding = paddingValues
                 )
 

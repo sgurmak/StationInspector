@@ -9,7 +9,8 @@ data class Station(
     val latitude: Double = 0.0,
     val longitude: Double = 0.0,
     val inspectionDate: LocalDate?,
-    val status: StationStatus
+    val status: StationStatus,
+    val orderIndex: Int = 0
 )
 
 data class Photo(

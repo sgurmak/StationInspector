@@ -81,7 +81,8 @@ private val WarningRed       = AccentPink
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StationListScreen(
-    viewModel:         StationListViewModel = hiltViewModel(),
+    routeViewModel:    RouteViewModel = hiltViewModel(),
+    settingsViewModel: SettingsViewModel = hiltViewModel(),
     onStationClick:    (String, Int) -> Unit,
     onNavigateToPoi:   (Double, Double, String) -> Unit = { _, _, _ -> },
     onNavigateToMap:   () -> Unit = {},
@@ -89,27 +90,35 @@ fun StationListScreen(
     contentPadding: PaddingValues = PaddingValues()
 ) {
     // ── Collect ViewModel state ───────────────────────────────────────────────
-    val selectedDate    by viewModel.selectedDate.collectAsState()
-    val stableRouteDate by viewModel.stableRouteDate.collectAsState()
-    val availableDates  by viewModel.availableDates.collectAsState()
-    val routeItems      by viewModel.routeItems.collectAsState()
-    val routeInfo       by viewModel.routeInfo.collectAsState()
-    val isLoading       by viewModel.isLoading.collectAsState()
-    val isOptimizing    by viewModel.isOptimizing.collectAsState()
+    val selectedDate    by routeViewModel.selectedDate.collectAsState()
+    val stableRouteDate by routeViewModel.stableRouteDate.collectAsState()
+    val availableDates  by routeViewModel.availableDates.collectAsState()
+    val routeItems      by routeViewModel.routeItems.collectAsState()
+    val routeInfo       by routeViewModel.routeInfo.collectAsState()
+    val isLoading       by settingsViewModel.isLoading.collectAsState()
+    val isOptimizing    by routeViewModel.isOptimizing.collectAsState()
 
     val snackbarHostState = remember { SnackbarHostState() }
+    // The Work screen hosts the only SnackbarHost, so it surfaces events from
+    // both the route operations (optimize, inspection) and the settings
+    // operations (CSV import) it observes.
     LaunchedEffect(Unit) {
-        viewModel.uiEvent.collect { event ->
+        routeViewModel.uiEvent.collect { event ->
             when (event) {
-                is StationListViewModel.UiEvent.ShowSnackbar -> {
-                    snackbarHostState.showSnackbar(event.message)
-                }
+                is UiEvent.ShowSnackbar -> snackbarHostState.showSnackbar(event.message)
+            }
+        }
+    }
+    LaunchedEffect(Unit) {
+        settingsViewModel.uiEvent.collect { event ->
+            when (event) {
+                is UiEvent.ShowSnackbar -> snackbarHostState.showSnackbar(event.message)
             }
         }
     }
 
     // ── Map expand / collapse — state is persisted per date in the ViewModel ──
-    val mapExpandedByDate by viewModel.mapExpandedByDate.collectAsState()
+    val mapExpandedByDate by routeViewModel.mapExpandedByDate.collectAsState()
     val isMapExpanded = selectedDate?.let { mapExpandedByDate[it] } ?: true
 
 
@@ -139,7 +148,7 @@ fun StationListScreen(
             CalendarRow(
                 availableDates = availableDates,
                 selectedDate   = selectedDate,
-                onDateSelected = viewModel::onDateSelected
+                onDateSelected = routeViewModel::onDateSelected
             )
 
             // key(stableRouteDate) resets this block only when routeItems for the new
@@ -158,9 +167,9 @@ fun StationListScreen(
                     onNavigateToMap = onNavigateToMap,
                     onStationClick  = onStationClick,
                     onNavigateToPoi = onNavigateToPoi,
-                    onToggleMap     = viewModel::toggleMapExpanded,
-                    onSaveScroll    = viewModel::saveScrollPositionForDate,
-                    getScroll       = viewModel::getScrollPositionForDate
+                    onToggleMap     = routeViewModel::toggleMapExpanded,
+                    onSaveScroll    = routeViewModel::saveScrollPositionForDate,
+                    getScroll       = routeViewModel::getScrollPositionForDate
                 )
             } // end key(stableRouteDate)
         }

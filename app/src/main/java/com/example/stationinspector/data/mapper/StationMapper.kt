@@ -13,7 +13,8 @@ fun StationEntity.toDomain(): Station {
         latitude = latitude,
         longitude = longitude,
         inspectionDate = inspectionDate,
-        status = status
+        status = status,
+        orderIndex = orderIndex
     )
 }
 
@@ -25,7 +26,8 @@ fun Station.toEntity(): StationEntity {
         latitude = latitude,
         longitude = longitude,
         inspectionDate = inspectionDate,
-        status = status
+        status = status,
+        orderIndex = orderIndex
     )
 }
 

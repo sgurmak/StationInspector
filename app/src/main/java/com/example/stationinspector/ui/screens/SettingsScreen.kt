@@ -40,7 +40,7 @@ private val DestructiveAccent = AccentPink          // Clear DB icon + text
 
 @Composable
 fun SettingsScreen(
-    viewModel:      StationListViewModel = hiltViewModel(),
+    viewModel:      SettingsViewModel = hiltViewModel(),
     onNavigateBack: () -> Unit,
     contentPadding: PaddingValues = PaddingValues()
 ) {

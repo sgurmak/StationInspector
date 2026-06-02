@@ -64,17 +64,19 @@ private val MapCardContent = CardContent
 
 @Composable
 fun MapScreen(
-    viewModel: StationListViewModel = hiltViewModel(),
+    routeViewModel: RouteViewModel = hiltViewModel(),
+    searchViewModel: SearchViewModel = hiltViewModel(),
+    shortcutsViewModel: ShortcutsViewModel = hiltViewModel(),
     contentPadding: PaddingValues = PaddingValues()
 ) {
-    val routeItems by viewModel.routeItems.collectAsState()
-    val routeInfo by viewModel.routeInfo.collectAsState()
-    val isOptimizing by viewModel.isOptimizing.collectAsState()
-    val searchQuery by viewModel.searchQuery.collectAsState()
-    val searchState by viewModel.searchState.collectAsState()
-    val shortcuts by viewModel.shortcuts.collectAsState()
-    val isRoundTrip by viewModel.isRoundTripEnabled.collectAsState()
-    val editingPoi by viewModel.editingPoi.collectAsState()
+    val routeItems by routeViewModel.routeItems.collectAsState()
+    val routeInfo by routeViewModel.routeInfo.collectAsState()
+    val isOptimizing by routeViewModel.isOptimizing.collectAsState()
+    val searchQuery by searchViewModel.searchQuery.collectAsState()
+    val searchState by searchViewModel.searchState.collectAsState()
+    val shortcuts by shortcutsViewModel.shortcuts.collectAsState()
+    val isRoundTrip by routeViewModel.isRoundTripEnabled.collectAsState()
+    val editingPoi by routeViewModel.editingPoi.collectAsState()
 
     MapScreenContent(
         routeItems = routeItems,
@@ -85,20 +87,27 @@ fun MapScreen(
         shortcuts = shortcuts,
         isRoundTrip = isRoundTrip,
         editingPoi = editingPoi,
-        onSearchQueryChanged = viewModel::onSearchQueryChanged,
-        onAddPoiToRoute = viewModel::addPoiToRoute,
-        onAddShortcutToRoute = viewModel::addShortcutToRoute,
-        onReorderItems = viewModel::reorderItems,
-        onToggleHidePoi = viewModel::toggleHidePoi,
-        onDeletePoi = viewModel::deletePoi,
-        onStartEditingPoi = viewModel::startEditingPoi,
-        onCancelEditingPoi = viewModel::cancelEditingPoi,
-        onSaveEditedPoi = viewModel::saveEditedPoi,
-        onOptimizeRoute = viewModel::optimizeRoute,
-        onSetRoundTripEnabled = viewModel::setRoundTripEnabled,
-        onUpdateShortcut = viewModel::updateShortcut,
-        onCreateNewShortcut = viewModel::createNewShortcut,
-        onDeleteShortcut = viewModel::deleteShortcut,
+        onSearchQueryChanged = searchViewModel::onSearchQueryChanged,
+        // Adding to the route clears the search box (previously done inside the VM).
+        onAddPoiToRoute = { poi ->
+            routeViewModel.addPoiToRoute(poi)
+            searchViewModel.clearSearch()
+        },
+        onAddShortcutToRoute = { shortcutId, poi ->
+            routeViewModel.addShortcutToRoute(shortcutId, poi)
+            searchViewModel.clearSearch()
+        },
+        onReorderItems = routeViewModel::reorderItems,
+        onToggleHidePoi = routeViewModel::toggleHidePoi,
+        onDeletePoi = routeViewModel::deletePoi,
+        onStartEditingPoi = routeViewModel::startEditingPoi,
+        onCancelEditingPoi = routeViewModel::cancelEditingPoi,
+        onSaveEditedPoi = routeViewModel::saveEditedPoi,
+        onOptimizeRoute = routeViewModel::optimizeRoute,
+        onSetRoundTripEnabled = routeViewModel::setRoundTripEnabled,
+        onUpdateShortcut = shortcutsViewModel::updateShortcut,
+        onCreateNewShortcut = shortcutsViewModel::createNewShortcut,
+        onDeleteShortcut = shortcutsViewModel::deleteShortcut,
         contentPadding = contentPadding
     )
 }
