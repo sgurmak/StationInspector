@@ -417,156 +417,39 @@ fun MapScreenContent(
                         }
                         
                         if (isSearchFocused || searchQuery.isNotEmpty()) {
-                            LazyColumn(
-                                modifier = Modifier.fillMaxWidth().weight(1f),
-                                contentPadding = PaddingValues(16.dp)
-                            ) {
-                                when (val state = searchState) {
-                                    is SearchUiState.Idle -> {
-                                        item { Text("Type to search...", color = MapTextLight.copy(alpha = 0.5f), modifier = Modifier.padding(16.dp)) }
-                                    }
-                                    is SearchUiState.Loading -> {
-                                        item { CircularProgressIndicator(color = MapLight, modifier = Modifier.padding(16.dp).align(Alignment.CenterHorizontally)) }
-                                    }
-                                    is SearchUiState.Error -> {
-                                        item { Text("Error: ${state.message}", color = Color.Red, modifier = Modifier.padding(16.dp)) }
-                                    }
-                                    is SearchUiState.Success -> {
-                                        if (state.results.isEmpty()) {
-                                            item { Text("No results found.", color = MapTextLight.copy(alpha = 0.5f), modifier = Modifier.padding(16.dp)) }
-                                        } else {
-                                            items(state.results) { poi ->
-                                                Row(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .clickable(enabled = activeShortcutSearchId == null) { 
-                                                            focusManager.clearFocus()
-                                                            onAddPoiToRoute(poi)
-                                                        }
-                                                        .padding(vertical = 12.dp),
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    Icon(Icons.Default.AddLocation, contentDescription = "Add to list", tint = MapTextLight, modifier = Modifier.size(24.dp))
-                                                    Spacer(modifier = Modifier.width(16.dp))
-                                                    Column(modifier = Modifier.weight(1f)) {
-                                                        Text(poi.name, color = MapTextLight, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                        
-                                                        val cityAddr = listOfNotNull(poi.city, poi.address).joinToString(", ").takeIf { it.isNotBlank() }
-                                                        if (cityAddr != null) {
-                                                            Text(
-                                                                text = cityAddr,
-                                                                color = MapTextLight.copy(alpha = 0.7f),
-                                                                fontSize = 14.sp,
-                                                                maxLines = 1,
-                                                                overflow = TextOverflow.Ellipsis
-                                                            )
-                                                        }
-                                                        
-                                                        if (!poi.region.isNullOrBlank()) {
-                                                            Text(
-                                                                text = poi.region,
-                                                                color = Color.Gray,
-                                                                fontSize = 12.sp,
-                                                                maxLines = 1,
-                                                                overflow = TextOverflow.Ellipsis
-                                                            )
-                                                        }
-                                                    }
-                                                    
-                                                    if (activeShortcutSearchId != null) {
-                                                        TextButton(onClick = { shortcutToConfirm = activeShortcutSearchId!! to poi }) {
-                                                            Text("+ Save", color = MapAccent, fontWeight = FontWeight.Bold)
-                                                        }
-                                                    }
-                                                }
-                                                HorizontalDivider(color = MapLight.copy(alpha = 0.1f))
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                            SearchResultsList(
+                                searchState = searchState,
+                                isShortcutMode = activeShortcutSearchId != null,
+                                onResultClick = { poi ->
+                                    focusManager.clearFocus()
+                                    onAddPoiToRoute(poi)
+                                },
+                                onSaveToShortcut = { poi ->
+                                    activeShortcutSearchId?.let { shortcutToConfirm = it to poi }
+                                },
+                                modifier = Modifier.fillMaxWidth().weight(1f)
+                            )
                         } else {
-                            val sortedShortcuts = shortcuts.sortedWith(compareBy({ it.id != "1" && it.id != "2" }, { it.id }))
-                            LazyRow(
-                                contentPadding = PaddingValues(start = 14.dp, end = 14.dp),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ShortcutsRow(
+                                shortcuts = shortcuts,
+                                onShortcutClick = { shortcut ->
+                                    val poi = shortcut.poiItem
+                                    if (poi == null) {
+                                        activeShortcutSearchId = shortcut.id
+                                        pendingShortcutActivation = true
+                                        focusRequester.requestFocus()
+                                    } else {
+                                        onAddShortcutToRoute(shortcut.id, poi)
+                                    }
+                                },
+                                onShortcutLongClick = { shortcut -> editingShortcut = shortcut },
+                                onAddNewClick = {
+                                    activeShortcutSearchId = "NEW"
+                                    pendingShortcutActivation = true
+                                    focusRequester.requestFocus()
+                                },
                                 modifier = Modifier.padding(top = 16.dp)
-                            ) {
-                                items(sortedShortcuts) { shortcut ->
-                                    val label = shortcut.customName ?: shortcut.label
-                                    val icon = when {
-                                        shortcut.poiItem == null -> Icons.Default.Add
-                                        shortcut.label == "Home" -> Icons.Default.Home
-                                        shortcut.label == "Work" -> Icons.Default.Work
-                                        else -> Icons.Default.Place
-                                    }
-
-                                    Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.Center,
-                                        modifier = Modifier
-                                            .size(width = 80.dp, height = 60.dp)
-                                            .background(Color.Transparent, RoundedCornerShape(12.dp))
-                                            .border(1.dp, MapLight, RoundedCornerShape(12.dp))
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .combinedClickable(
-                                                onClick = {
-                                                    val poi = shortcut.poiItem
-                                                    if (poi == null) {
-                                                        activeShortcutSearchId = shortcut.id
-                                                        pendingShortcutActivation = true
-                                                        focusRequester.requestFocus()
-                                                    } else {
-                                                        onAddShortcutToRoute(shortcut.id, poi)
-                                                    }
-                                                },
-                                                onLongClick = {
-                                                    editingShortcut = shortcut
-                                                }
-                                            )
-                                            .padding(4.dp)
-                                    ) {
-                                        Icon(imageVector = icon, contentDescription = label, tint = MapLight, modifier = Modifier.size(30.dp))
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text(
-                                            text = label, 
-                                            color = MapLight, 
-                                            fontSize = 12.sp, 
-                                            fontWeight = FontWeight.Medium,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                }
-                                item {
-                                    Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.Center,
-                                        modifier = Modifier
-                                            .size(width = 80.dp, height = 60.dp)
-                                            .background(Color.Transparent, RoundedCornerShape(12.dp))
-                                            .border(1.dp, MapLight, RoundedCornerShape(12.dp))
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .clickable {
-                                                activeShortcutSearchId = "NEW"
-                                                pendingShortcutActivation = true
-                                                focusRequester.requestFocus()
-                                            }
-                                            .padding(4.dp)
-                                    ) {
-                                        Icon(imageVector = Icons.Default.Add, contentDescription = "Add New", tint = MapLight, modifier = Modifier.size(30.dp))
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text(
-                                            text = "Add new", 
-                                            color = MapLight, 
-                                            fontSize = 12.sp, 
-                                            fontWeight = FontWeight.Medium,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                }
-                            }
+                            )
                             
                             Text(
                                 text = "List of points",
@@ -982,6 +865,200 @@ fun ReorderableMapList(
             }
         }
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  SearchResultsList — stateless geocoding-results list for the map sheet
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+fun SearchResultsList(
+    searchState: SearchUiState,
+    isShortcutMode: Boolean,
+    onResultClick: (PoiItem) -> Unit,
+    onSaveToShortcut: (PoiItem) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    LazyColumn(
+        modifier = modifier,
+        contentPadding = PaddingValues(16.dp)
+    ) {
+        when (val state = searchState) {
+            is SearchUiState.Idle -> {
+                item { Text("Type to search...", color = MapTextLight.copy(alpha = 0.5f), modifier = Modifier.padding(16.dp)) }
+            }
+            is SearchUiState.Loading -> {
+                item {
+                    Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = MapLight)
+                    }
+                }
+            }
+            is SearchUiState.Error -> {
+                item { Text("Error: ${state.message}", color = Color.Red, modifier = Modifier.padding(16.dp)) }
+            }
+            is SearchUiState.Success -> {
+                if (state.results.isEmpty()) {
+                    item { Text("No results found.", color = MapTextLight.copy(alpha = 0.5f), modifier = Modifier.padding(16.dp)) }
+                } else {
+                    items(state.results) { poi ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(enabled = !isShortcutMode) { onResultClick(poi) }
+                                .padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.AddLocation, contentDescription = "Add to list", tint = MapTextLight, modifier = Modifier.size(24.dp))
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(poi.name, color = MapTextLight, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+
+                                val cityAddr = listOfNotNull(poi.city, poi.address).joinToString(", ").takeIf { it.isNotBlank() }
+                                if (cityAddr != null) {
+                                    Text(
+                                        text = cityAddr,
+                                        color = MapTextLight.copy(alpha = 0.7f),
+                                        fontSize = 14.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+
+                                if (!poi.region.isNullOrBlank()) {
+                                    Text(
+                                        text = poi.region,
+                                        color = Color.Gray,
+                                        fontSize = 12.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+
+                            if (isShortcutMode) {
+                                TextButton(onClick = { onSaveToShortcut(poi) }) {
+                                    Text("+ Save", color = MapAccent, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                        HorizontalDivider(color = MapLight.copy(alpha = 0.1f))
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  ShortcutsRow — stateless horizontal row of shortcut chips + "Add new"
+// ─────────────────────────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun ShortcutsRow(
+    shortcuts: List<ShortcutUiModel>,
+    onShortcutClick: (ShortcutUiModel) -> Unit,
+    onShortcutLongClick: (ShortcutUiModel) -> Unit,
+    onAddNewClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val sortedShortcuts = shortcuts.sortedWith(compareBy({ it.id != "1" && it.id != "2" }, { it.id }))
+    LazyRow(
+        contentPadding = PaddingValues(start = 14.dp, end = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = modifier
+    ) {
+        items(sortedShortcuts) { shortcut ->
+            val label = shortcut.customName ?: shortcut.label
+            val icon = when {
+                shortcut.poiItem == null -> Icons.Default.Add
+                shortcut.label == "Home" -> Icons.Default.Home
+                shortcut.label == "Work" -> Icons.Default.Work
+                else -> Icons.Default.Place
+            }
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier
+                    .size(width = 80.dp, height = 60.dp)
+                    .background(Color.Transparent, RoundedCornerShape(12.dp))
+                    .border(1.dp, MapLight, RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(12.dp))
+                    .combinedClickable(
+                        onClick = { onShortcutClick(shortcut) },
+                        onLongClick = { onShortcutLongClick(shortcut) }
+                    )
+                    .padding(4.dp)
+            ) {
+                Icon(imageVector = icon, contentDescription = label, tint = MapLight, modifier = Modifier.size(30.dp))
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = label,
+                    color = MapLight,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+        item {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier
+                    .size(width = 80.dp, height = 60.dp)
+                    .background(Color.Transparent, RoundedCornerShape(12.dp))
+                    .border(1.dp, MapLight, RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { onAddNewClick() }
+                    .padding(4.dp)
+            ) {
+                Icon(imageVector = Icons.Default.Add, contentDescription = "Add New", tint = MapLight, modifier = Modifier.size(30.dp))
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "Add new",
+                    color = MapLight,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF13111B)
+@Composable
+fun SearchResultsListPreview() {
+    SearchResultsList(
+        searchState = SearchUiState.Success(
+            listOf(
+                PoiItem("1", "Praha hlavní nádraží", "Praha", "Wilsonova 8", "Praha", 50.08, 14.43),
+                PoiItem("2", "Brno hlavní nádraží", "Brno", "Nádražní 1", "Jihomoravský", 49.19, 16.61)
+            )
+        ),
+        isShortcutMode = false,
+        onResultClick = {},
+        onSaveToShortcut = {}
+    )
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF13111B)
+@Composable
+fun ShortcutsRowPreview() {
+    ShortcutsRow(
+        shortcuts = listOf(
+            ShortcutUiModel("1", "Home", null, null, true, false, ShortcutEntity("1", "Home", null, null, true)),
+            ShortcutUiModel("2", "Work", null, null, true, false, ShortcutEntity("2", "Work", null, null, true))
+        ),
+        onShortcutClick = {},
+        onShortcutLongClick = {},
+        onAddNewClick = {}
+    )
 }
 
 @Preview(showBackground = true, backgroundColor = 0xFF13111B)
