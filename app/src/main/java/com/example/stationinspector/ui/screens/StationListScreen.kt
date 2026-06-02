@@ -268,16 +268,21 @@ private fun RouteContent(
         // fillMaxSize → AndroidView always has a stable non-zero size
         val density = LocalDensity.current
         val mapSafeMarginPx = with(density) { (40.dp + 16.dp).roundToPx() }
-        MapWidget(
-            routeItems           = routeItems,
-            routeInfo            = routeInfo,
-            isMapExpanded        = isMapExpanded,
-            isInteractive        = false,
-            isMiniMap            = true,
-            highlightedItemIndex = activeIndex,
-            safeMarginPx         = mapSafeMarginPx,
-            modifier             = Modifier.fillMaxSize()
-        )
+        // Only mount the osmdroid map while expanded. When collapsed it shrinks
+        // to 40dp and sits entirely behind the 40dp info bar — invisible, yet it
+        // would keep rendering tiles and markers and draining the battery.
+        if (isMapExpanded) {
+            MapWidget(
+                routeItems           = routeItems,
+                routeInfo            = routeInfo,
+                isMapExpanded        = isMapExpanded,
+                isInteractive        = false,
+                isMiniMap            = true,
+                highlightedItemIndex = activeIndex,
+                safeMarginPx         = mapSafeMarginPx,
+                modifier             = Modifier.fillMaxSize()
+            )
+        }
 
         // ── Transparent clickable layer — excludes info bar and slider zone ──
         // bottom = 40dp: info bar height; end = 40dp: slider touch zone width.

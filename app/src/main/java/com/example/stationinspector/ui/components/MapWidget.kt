@@ -45,9 +45,20 @@ fun MapWidget(
     val context        = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // Configure osmdroid once per composition
-    Configuration.getInstance().load(context, PreferenceManager.getDefaultSharedPreferences(context))
-    Configuration.getInstance().userAgentValue = context.packageName
+    // Configure osmdroid once (not on every recomposition). A long tile
+    // expiration means panning the same area doesn't re-download tiles, which
+    // saves both network traffic and battery.
+    remember(context) {
+        val config = Configuration.getInstance()
+        config.load(context, PreferenceManager.getDefaultSharedPreferences(context))
+        config.userAgentValue = context.packageName
+        config.expirationOverrideDuration = 7L * 24 * 60 * 60 * 1000 // 7 days
+        true
+    }
+
+    // The inactive mini-marker is identical for every dot — build it once and
+    // reuse it instead of allocating a fresh bitmap per marker per redraw.
+    val inactiveMiniMarker = remember(context) { createMiniInactiveMarkerBitmap(context) }
 
     val mapView = remember {
         MapView(context).apply {
@@ -162,6 +173,66 @@ fun MapWidget(
         }
     }
 
+    // Rebuild the route overlays only when the route data actually changes —
+    // not on every recomposition. Reuses the cached inactive marker so a long
+    // route doesn't allocate dozens of identical bitmaps each redraw.
+    LaunchedEffect(routeItems, routeInfo.polylinePoints, editingPoi, isMiniMap, highlightedItemIndex) {
+        mapView.overlays.removeAll { it is Polyline || it is org.osmdroid.views.overlay.Marker }
+
+        if (routeInfo.polylinePoints.isNotEmpty()) {
+            val polylineMain = Polyline(mapView)
+            polylineMain.infoWindow = null
+            polylineMain.outlinePaint.color = android.graphics.Color.parseColor("#8B5CF6")
+            polylineMain.outlinePaint.strokeWidth = 8f
+            polylineMain.setPoints(ArrayList(routeInfo.polylinePoints))
+            mapView.overlays.add(polylineMain)
+        }
+
+        val validItems = routeItems.filter {
+            it.latitude != 0.0 && it.longitude != 0.0 && it.stableId != editingPoi?.stableId
+        }
+        val isRoundTrip = !isMiniMap && validItems.size >= 2 &&
+            validItems.first().name == Shortcut.NAME_HOME &&
+            validItems.last().name == Shortcut.NAME_HOME
+
+        var highlightedMarker: org.osmdroid.views.overlay.Marker? = null
+        validItems.forEachIndexed { index, item ->
+            if (isRoundTrip && index == validItems.lastIndex) return@forEachIndexed
+
+            val marker = org.osmdroid.views.overlay.Marker(mapView)
+            marker.infoWindow = null
+            marker.position = org.osmdroid.util.GeoPoint(item.latitude, item.longitude)
+            val markerLabel = if (isRoundTrip && index == 0) "1/${validItems.size}" else "${index + 1}"
+            marker.title = "$markerLabel. ${item.name}"
+            if (isMiniMap) {
+                if (index == highlightedItemIndex) {
+                    marker.icon = createMiniHighlightedMarkerBitmap(context, index + 1)
+                    marker.setAnchor(
+                        org.osmdroid.views.overlay.Marker.ANCHOR_CENTER,
+                        org.osmdroid.views.overlay.Marker.ANCHOR_CENTER
+                    )
+                    highlightedMarker = marker
+                    return@forEachIndexed
+                } else {
+                    marker.icon = inactiveMiniMarker // cached, shared instance
+                }
+                marker.setAnchor(
+                    org.osmdroid.views.overlay.Marker.ANCHOR_CENTER,
+                    org.osmdroid.views.overlay.Marker.ANCHOR_CENTER
+                )
+            } else {
+                marker.icon = createLargeNumberedMarkerBitmap(context, markerLabel)
+                marker.setAnchor(
+                    org.osmdroid.views.overlay.Marker.ANCHOR_CENTER,
+                    org.osmdroid.views.overlay.Marker.ANCHOR_BOTTOM
+                )
+            }
+            mapView.overlays.add(marker)
+        }
+        highlightedMarker?.let { mapView.overlays.add(it) }
+        mapView.invalidate()
+    }
+
     // ── Render the osmdroid MapView inside Compose ────────────────────────────
     AndroidView(
         modifier = modifier
@@ -170,83 +241,15 @@ fun MapWidget(
             .clipToBounds(),
         factory  = { mapView },
         update = { view ->
+            // Cheap, idempotent per-recomposition work only. Overlay building
+            // lives in the keyed LaunchedEffect above so it runs solely on data
+            // changes, not on every scroll/slider recomposition.
             view.setMultiTouchControls(isInteractive)
             if (!isInteractive) {
                 view.setOnTouchListener { _, _ -> true }
             } else {
                 view.setOnTouchListener(null)
             }
-
-            // Clear existing lines and markers safely without killing MapEventsOverlay
-            view.overlays.removeAll { it is org.osmdroid.views.overlay.Polyline || it is org.osmdroid.views.overlay.Marker }
-
-            // ── Route polyline (single purple line) ──────────────────────────────
-            if (routeInfo.polylinePoints.isNotEmpty()) {
-                val polylineMain = Polyline(view)
-                polylineMain.infoWindow = null
-                polylineMain.outlinePaint.color = android.graphics.Color.parseColor("#8B5CF6")
-                polylineMain.outlinePaint.strokeWidth = 8f
-                polylineMain.setPoints(ArrayList(routeInfo.polylinePoints))
-                view.overlays.add(polylineMain)
-            }
-
-            // ── Numbered station markers ──────────────────────────────────────────
-            // The highlighted marker is deferred and added last so it renders above
-            // the polyline and all other markers.
-            val validItems = routeItems.filter { it.latitude != 0.0 && it.longitude != 0.0 && it.stableId != editingPoi?.stableId }
-            val isRoundTrip = !isMiniMap && validItems.size >= 2 &&
-                              validItems.first().name == Shortcut.NAME_HOME &&
-                              validItems.last().name == Shortcut.NAME_HOME
-
-            var highlightedMarker: org.osmdroid.views.overlay.Marker? = null
-            validItems.forEachIndexed { index, item ->
-                if (isRoundTrip && index == validItems.lastIndex) {
-                    return@forEachIndexed // Skip the last marker as it overlaps with the first one
-                }
-
-                val marker = org.osmdroid.views.overlay.Marker(view)
-                marker.infoWindow = null
-                marker.position = org.osmdroid.util.GeoPoint(item.latitude, item.longitude)
-                
-                val markerLabel = if (isRoundTrip && index == 0) {
-                    "1/${validItems.size}"
-                } else {
-                    "${index + 1}"
-                }
-
-                marker.title = "$markerLabel. ${item.name}"
-                if (isMiniMap) {
-                    if (index == highlightedItemIndex) {
-                        marker.icon = createMiniHighlightedMarkerBitmap(context, index + 1)
-                        marker.setAnchor(
-                            org.osmdroid.views.overlay.Marker.ANCHOR_CENTER,
-                            org.osmdroid.views.overlay.Marker.ANCHOR_CENTER
-                        )
-                        highlightedMarker = marker   // will be added after the loop
-                        return@forEachIndexed
-                    } else {
-                        marker.icon = createMiniInactiveMarkerBitmap(context)
-                    }
-                    marker.setAnchor(
-                        org.osmdroid.views.overlay.Marker.ANCHOR_CENTER,
-                        org.osmdroid.views.overlay.Marker.ANCHOR_CENTER
-                    )
-                } else {
-                    marker.icon = createLargeNumberedMarkerBitmap(context, markerLabel)
-                    marker.setAnchor(
-                        org.osmdroid.views.overlay.Marker.ANCHOR_CENTER,
-                        org.osmdroid.views.overlay.Marker.ANCHOR_BOTTOM
-                    )
-                }
-                view.overlays.add(marker)
-            }
-            // Add highlighted marker on top of everything else
-            highlightedMarker?.let { view.overlays.add(it) }
-
-            // Zoom to bounding box logic moved to LaunchedEffect to avoid jitter during sheet scrolling
-
-            // Force redraw
-            view.invalidate()
         }
     )
 }

@@ -137,7 +137,12 @@ class CameraXController @Inject constructor(
         }
 
     fun stopCamera() {
+        // Unbind AND release the references so the camera fully powers down when
+        // leaving the screen, and a stale unbound use case can't be reused.
         cameraProvider?.unbindAll()
+        imageCapture = null
+        camera = null
+        cameraProvider = null
     }
 
     fun setZoomRatio(zoomRatio: Float) {
