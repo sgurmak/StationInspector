@@ -3,8 +3,6 @@ package com.example.stationinspector.ui.screens
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.room.withTransaction
-import com.example.stationinspector.data.local.AppDatabase
 import com.example.stationinspector.domain.model.Poi
 import com.example.stationinspector.domain.model.RouteWaypoint
 import com.example.stationinspector.domain.model.Shortcut
@@ -13,6 +11,7 @@ import com.example.stationinspector.domain.repository.PreferencesRepository
 import com.example.stationinspector.domain.repository.RouteRepository
 import com.example.stationinspector.domain.repository.ShortcutRepository
 import com.example.stationinspector.domain.repository.StationRepository
+import com.example.stationinspector.domain.repository.TransactionRunner
 import com.example.stationinspector.utils.PolylineUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -56,7 +55,7 @@ class RouteViewModel @Inject constructor(
     private val poiRepository: PoiRepository,
     private val preferencesRepository: PreferencesRepository,
     private val shortcutRepository: ShortcutRepository,
-    private val database: AppDatabase
+    private val transactionRunner: TransactionRunner
 ) : ViewModel() {
 
     private companion object {
@@ -275,7 +274,7 @@ class RouteViewModel @Inject constructor(
     fun addPoiToRoute(poi: PoiItem) {
         val date = _selectedDate.value ?: return
         viewModelScope.launch(Dispatchers.IO) {
-            database.withTransaction {
+            transactionRunner.runInTransaction {
                 insertPoiAtCorrectOrderIndex(poi, date)
             }
         }
@@ -293,7 +292,7 @@ class RouteViewModel @Inject constructor(
             if (shortcutId == Shortcut.ID_HOME) {
                 rebuildHomePointsAndIndices(date, isRoundTripEnabled.value, finalPoi)
             } else {
-                database.withTransaction {
+                transactionRunner.runInTransaction {
                     insertPoiAtCorrectOrderIndex(finalPoi, date)
                 }
             }
@@ -324,7 +323,7 @@ class RouteViewModel @Inject constructor(
         newHomePoi: PoiItem? = null,
         clearHome: Boolean = false
     ) {
-        database.withTransaction {
+        transactionRunner.runInTransaction {
             val stations = stationRepository.getStationsForDateSync(date)
             val pois = poiRepository.getPoisForDate(date)
 
@@ -448,7 +447,7 @@ class RouteViewModel @Inject constructor(
      */
     fun reorderItems(items: List<RouteListItem>) {
         viewModelScope.launch(Dispatchers.IO) {
-            database.withTransaction {
+            transactionRunner.runInTransaction {
                 val isRoundTrip = isRoundTripEnabled.value
                 val hasHome = items.any { it.name == NAME_HOME }
 

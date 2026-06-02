@@ -13,6 +13,7 @@ import com.example.stationinspector.data.local.dao.ShortcutDao
 import com.example.stationinspector.data.remote.OrsApiService
 import com.example.stationinspector.data.repository.PoiRepositoryImpl
 import com.example.stationinspector.data.repository.PreferencesRepositoryImpl
+import com.example.stationinspector.data.repository.RoomTransactionRunner
 import com.example.stationinspector.data.repository.RouteRepositoryImpl
 import com.example.stationinspector.data.repository.ShortcutRepositoryImpl
 import com.example.stationinspector.data.repository.StationRepositoryImpl
@@ -21,6 +22,7 @@ import com.example.stationinspector.domain.repository.PreferencesRepository
 import com.example.stationinspector.domain.repository.RouteRepository
 import com.example.stationinspector.domain.repository.ShortcutRepository
 import com.example.stationinspector.domain.repository.StationRepository
+import com.example.stationinspector.domain.repository.TransactionRunner
 import com.google.gson.Gson
 import dagger.Module
 import dagger.Provides
@@ -55,6 +57,11 @@ object DatabaseModule {
         }
         .build()
     }
+
+    @Provides
+    @Singleton
+    fun provideTransactionRunner(db: AppDatabase): TransactionRunner =
+        RoomTransactionRunner(db)
 
     @Provides
     @Singleton
