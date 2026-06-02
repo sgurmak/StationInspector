@@ -1,9 +1,7 @@
 package com.example.stationinspector.ui.screens
 
-import android.content.ActivityNotFoundException
-import android.content.Intent
-import android.net.Uri
 import android.widget.Toast
+import com.example.stationinspector.utils.openInMaps
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -701,15 +699,7 @@ fun StationCard(
             IconButton(
                 onClick  = {
                     if (station.latitude != 0.0 && station.longitude != 0.0) {
-                        val uri = Uri.parse(
-                            "geo:${station.latitude},${station.longitude}?q=${station.latitude},${station.longitude}(${Uri.encode(station.name)})"
-                        )
-                        val intent = Intent(Intent.ACTION_VIEW, uri)
-                        try {
-                            context.startActivity(intent)
-                        } catch (e: ActivityNotFoundException) {
-                            Toast.makeText(context, "No map application found", Toast.LENGTH_SHORT).show()
-                        }
+                        context.openInMaps(station.latitude, station.longitude, station.name)
                     } else {
                         Toast.makeText(context, "Coordinates not found for this station", Toast.LENGTH_SHORT).show()
                     }

@@ -7,6 +7,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -27,7 +28,9 @@ fun MainAppScreen(
 ) {
     val sharedViewModel: StationListViewModel = androidx.hilt.navigation.compose.hiltViewModel()
     val selectedDate by sharedViewModel.selectedDate.collectAsState()
-    var currentTab by remember { mutableStateOf(MainTab.STATION_LIST) }
+    // rememberSaveable so the selected tab survives process death / config change.
+    // MainTab is an enum (Serializable), so no custom Saver is required.
+    var currentTab by rememberSaveable { mutableStateOf(MainTab.STATION_LIST) }
 
     Scaffold(
         containerColor = Color.Transparent,

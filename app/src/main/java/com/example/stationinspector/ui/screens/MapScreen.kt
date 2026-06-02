@@ -635,8 +635,13 @@ fun MapScreenContent(
 }
 
 @Composable
-fun MapInfoBlock(icon: ImageVector, value: String, label: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+fun MapInfoBlock(
+    icon: ImageVector,
+    value: String,
+    label: String,
+    modifier: Modifier = Modifier
+) {
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         Icon(imageVector = icon, contentDescription = null, tint = MapTextLight, modifier = Modifier.size(24.dp))
         Spacer(modifier = Modifier.width(8.dp))
         Column(horizontalAlignment = Alignment.CenterHorizontally) {

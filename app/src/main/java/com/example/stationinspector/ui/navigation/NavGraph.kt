@@ -1,9 +1,5 @@
 package com.example.stationinspector.ui.navigation
 
-import android.content.ActivityNotFoundException
-import android.content.Intent
-import android.net.Uri
-import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -11,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.stationinspector.utils.openInMaps
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -76,13 +73,7 @@ fun StationInspectorNavGraph(
                         }
                     },
                     onNavigateToPoi = { lat, lon, name ->
-                        val uri       = Uri.parse("geo:$lat,$lon?q=${Uri.encode(name)}")
-                        val mapIntent = Intent(Intent.ACTION_VIEW, uri)
-                        try {
-                            context.startActivity(mapIntent)
-                        } catch (e: ActivityNotFoundException) {
-                            Toast.makeText(context, "Navigation app not found", Toast.LENGTH_SHORT).show()
-                        }
+                        context.openInMaps(lat, lon, name, notFoundMessage = "Navigation app not found")
                     }
                 )
 
