@@ -105,7 +105,11 @@ class CameraXController @Inject constructor(
                         matrix.postRotate(rotationDegrees.toFloat())
                         Bitmap.createBitmap(
                             originalBitmap, 0, 0, originalBitmap.width, originalBitmap.height, matrix, true
-                        )
+                        ).also {
+                            // The rotated copy is a new bitmap; free the source to
+                            // avoid leaking a full-resolution bitmap per capture.
+                            originalBitmap.recycle()
+                        }
                     } else {
                         originalBitmap
                     }

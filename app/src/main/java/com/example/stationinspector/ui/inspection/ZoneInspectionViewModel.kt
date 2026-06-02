@@ -131,7 +131,13 @@ class ZoneInspectionViewModel @Inject constructor(
         val zone = _selectedZone.value
         viewModelScope.launch(Dispatchers.IO) {
             val bitmap         = cameraXController.takePicture() ?: return@launch
-            val compressed     = imageCompressor.compress(bitmap, type)
+            // Free the capture bitmap as soon as it is encoded — otherwise a full
+            // resolution bitmap leaks per shot and a burst of captures hits OOM.
+            val compressed     = try {
+                imageCompressor.compress(bitmap, type)
+            } finally {
+                bitmap.recycle()
+            }
             val absolutePath   = fileStorageManager.savePhoto(compressed) ?: return@launch
 
             val station        = stationRepository.getStationById(currentStationId).firstOrNull()

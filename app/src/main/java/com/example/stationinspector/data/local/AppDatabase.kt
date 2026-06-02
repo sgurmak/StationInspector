@@ -72,6 +72,11 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_7_8 = object : androidx.room.migration.Migration(7, 8) {
             override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE stations ADD COLUMN orderIndex INTEGER NOT NULL DEFAULT 0")
+                // ShortcutEntity declares isRoundTrip, but MIGRATION_5_6 created the
+                // shortcuts table without it and 6->7 was a no-op. Without this ALTER,
+                // upgraders reach v8 with a schema that fails Room validation — only
+                // the destructive fallback was hiding it (by wiping all data).
+                database.execSQL("ALTER TABLE shortcuts ADD COLUMN isRoundTrip INTEGER NOT NULL DEFAULT 0")
                 database.execSQL("DROP TABLE pois")
                 database.execSQL("CREATE TABLE IF NOT EXISTS `pois` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `city` TEXT, `address` TEXT, `region` TEXT, `latitude` REAL NOT NULL, `longitude` REAL NOT NULL, `inspectionDate` TEXT NOT NULL, `orderIndex` INTEGER NOT NULL, PRIMARY KEY(`id`))")
             }
