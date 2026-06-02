@@ -26,8 +26,32 @@ class RouteRepositoryImpl @Inject constructor(
     private val stationDao: StationDao
 ) : RouteRepository {
 
-    private companion object {
-        const val TAG = "RouteRepositoryImpl"
+    companion object {
+        private const val TAG = "RouteRepositoryImpl"
+
+        /**
+         * Rebuilds the full visiting order from the optimizer output. [waypoints]
+         * is the original list (first = start; last = end when it duplicates the
+         * start, i.e. a round trip); [orderedJobIds] are the 1-based intermediate
+         * ids in the order the optimizer chose. Pure and side-effect free so the
+         * order/round-trip logic can be unit-tested without the network.
+         */
+        internal fun reconstructOptimizedOrder(
+            waypoints: List<RouteWaypoint>,
+            orderedJobIds: List<Int>
+        ): List<RouteWaypoint> {
+            if (waypoints.size < 2) return waypoints
+
+            val first = waypoints.first()
+            val last = waypoints.last()
+            val isRoundTrip = waypoints.size > 2 &&
+                first.latitude == last.latitude && first.longitude == last.longitude
+            val end = if (isRoundTrip) last else null
+            val intermediate = waypoints.subList(1, if (end != null) waypoints.size - 1 else waypoints.size)
+
+            val sortedIntermediate = orderedJobIds.mapNotNull { id -> intermediate.getOrNull(id - 1) }
+            return listOf(first) + sortedIntermediate + listOfNotNull(end)
+        }
     }
 
     override suspend fun getRouteSegment(
@@ -108,13 +132,12 @@ class RouteRepositoryImpl @Inject constructor(
                 .routes?.firstOrNull()?.steps
                 ?: throw IllegalStateException("Optimization returned no route")
 
-            // Reconstruct the visiting order from the optimizer's job steps.
-            val sortedIntermediate = steps
+            // Job step ids in the order the optimizer chose to visit them.
+            val orderedJobIds = steps
                 .filter { it.type == "job" && it.id != null }
-                .mapNotNull { step -> intermediate.getOrNull(step.id!! - 1) }
+                .map { it.id!! }
 
-            val ordered = listOf(start) + sortedIntermediate + listOfNotNull(end)
-            Result.success(OptimizedRoute(ordered))
+            Result.success(OptimizedRoute(reconstructOptimizedOrder(waypoints, orderedJobIds)))
         } catch (e: SocketTimeoutException) {
             Result.failure(Exception("Optimization timeout. The route might be too complex.", e))
         } catch (e: HttpException) {
