@@ -57,6 +57,9 @@ android {
             // Return default values (0/null/false) for un-mocked android.* calls
             // such as android.util.Log, so pure-logic unit tests don't crash.
             isReturnDefaultValues = true
+            // Robolectric needs the merged Android resources/manifest on the
+            // unit-test classpath to drive an in-memory Room (real SQLite) on the JVM.
+            isIncludeAndroidResources = true
         }
     }
 }
@@ -117,10 +120,30 @@ dependencies {
 
     // Testing
     testImplementation(libs.junit)
+    // Runtime verification on the JVM: Robolectric runs Room on real SQLite,
+    // coroutines-test drives suspend/Flow code deterministically.
+    testImplementation("org.robolectric:robolectric:4.13")
+    testImplementation("androidx.test:core-ktx:1.6.1")
+    testImplementation("androidx.room:room-testing:2.6.1")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+}
+
+// Forked unit-test JVMs don't inherit the daemon's SSL system properties, so
+// Robolectric's runtime download of the android-all image fails behind a TLS-
+// intercepting AV/proxy. If `testTrustStore` is set (kept in ~/.gradle, off the
+// repo) point the test workers at that truststore so the download is trusted.
+tasks.withType<Test>().configureEach {
+    (project.findProperty("testTrustStore") as String?)?.let { store ->
+        val pass = project.findProperty("testTrustStorePassword") as String? ?: "changeit"
+        jvmArgs(
+            "-Djavax.net.ssl.trustStore=$store",
+            "-Djavax.net.ssl.trustStorePassword=$pass"
+        )
+    }
 }
