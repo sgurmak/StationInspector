@@ -1,16 +1,23 @@
 package com.example.stationinspector.domain.repository
 
-import com.example.stationinspector.data.local.entity.RouteCacheEntity
-import com.example.stationinspector.ui.screens.RouteListItem
-import org.osmdroid.util.GeoPoint
+import com.example.stationinspector.domain.model.GeoCoordinate
+import com.example.stationinspector.domain.model.OptimizedRoute
+import com.example.stationinspector.domain.model.RouteSegment
+import com.example.stationinspector.domain.model.RouteWaypoint
 
-data class RouteData(
-    val reorderedItems: List<RouteListItem>,
-    val polyline: List<GeoPoint>
-)
-
+/**
+ * Routing operations backed by the ORS API + local cache. The contract is
+ * expressed purely in domain types — no Room entities, UI models, or map-library
+ * classes leak across this boundary.
+ */
 interface RouteRepository {
-    suspend fun getRouteSegment(lat1: Double, lon1: Double, lat2: Double, lon2: Double): RouteCacheEntity
-    suspend fun fetchAndSaveCoordinates(stationId: Long, stationName: String): Pair<Double, Double>?
-    suspend fun optimizeAndFetchGeometry(items: List<RouteListItem>): Result<RouteData>
+
+    /** Distance/time/geometry for the leg between two coordinates (cached). */
+    suspend fun getRouteSegment(lat1: Double, lon1: Double, lat2: Double, lon2: Double): RouteSegment
+
+    /** Geocodes [stationName], persists the coordinates on the station, returns them. */
+    suspend fun fetchAndSaveCoordinates(stationId: Long, stationName: String): GeoCoordinate?
+
+    /** Optimizes the visiting order of [waypoints] (first/last may anchor a round trip). */
+    suspend fun optimizeAndFetchGeometry(waypoints: List<RouteWaypoint>): Result<OptimizedRoute>
 }

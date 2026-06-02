@@ -41,7 +41,7 @@ class SearchViewModel @Inject constructor(
             } else {
                 emit(SearchUiState.Loading)
                 try {
-                    val results = mapyCzRepository.searchLocation(query)
+                    val results = mapyCzRepository.searchLocation(query).map { it.toPoiItem() }
                     emit(SearchUiState.Success(results))
                 } catch (e: Exception) {
                     emit(SearchUiState.Error(e.localizedMessage ?: "Unknown error"))

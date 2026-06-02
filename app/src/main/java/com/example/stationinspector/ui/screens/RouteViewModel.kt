@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.room.withTransaction
 import com.example.stationinspector.data.local.AppDatabase
 import com.example.stationinspector.domain.model.Poi
+import com.example.stationinspector.domain.model.RouteWaypoint
 import com.example.stationinspector.domain.model.Shortcut
 import com.example.stationinspector.domain.repository.PoiRepository
 import com.example.stationinspector.domain.repository.PreferencesRepository
@@ -183,27 +184,31 @@ class RouteViewModel @Inject constructor(
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val result = routeRepository.optimizeAndFetchGeometry(validItems)
-                result.onSuccess { data ->
-                    val hiddenItems = routeItems.value.filter { it.isHidden }
-                    val newOrder = data.reorderedItems + hiddenItems
-                    val stationOrders = mutableListOf<Pair<Long, Int>>()
-                    val poiOrders     = mutableListOf<Pair<String, Int>>()
-
-                    newOrder.forEachIndexed { index, item ->
-                        if (item is StationItem) {
-                            stationOrders.add(item.station.id.toLong() to index)
-                        } else if (item is PoiItem) {
-                            poiOrders.add(item.id to index)
-                        }
-                    }
-
-                    stationRepository.updateStationOrders(stationOrders)
-                    poiRepository.updateOrders(poiOrders)
-                }.onFailure { e ->
-                    Log.w(TAG, "Route optimization returned a failure result", e)
-                    _uiEvent.emit(UiEvent.ShowSnackbar(e.message ?: "Optimization failed"))
+                val waypoints = validItems.map {
+                    RouteWaypoint(id = it.id, isStation = it.isStation, latitude = it.latitude, longitude = it.longitude)
                 }
+                routeRepository.optimizeAndFetchGeometry(waypoints)
+                    .onSuccess { optimized ->
+                        val hiddenItems = routeItems.value.filter { it.isHidden }
+                        // Visible items in the optimized order; hidden items keep
+                        // trailing slots so their order indices stay stable.
+                        val ordered = optimized.orderedWaypoints.map { it.isStation to it.id } +
+                            hiddenItems.map { it.isStation to it.id }
+
+                        val stationOrders = mutableListOf<Pair<Long, Int>>()
+                        val poiOrders     = mutableListOf<Pair<String, Int>>()
+                        ordered.forEachIndexed { index, (isStation, id) ->
+                            if (isStation) stationOrders.add(id.toLong() to index)
+                            else poiOrders.add(id to index)
+                        }
+
+                        stationRepository.updateStationOrders(stationOrders)
+                        poiRepository.updateOrders(poiOrders)
+                    }
+                    .onFailure { e ->
+                        Log.w(TAG, "Route optimization returned a failure result", e)
+                        _uiEvent.emit(UiEvent.ShowSnackbar(e.message ?: "Optimization failed"))
+                    }
             } catch (e: Exception) {
                 Log.e(TAG, "Unexpected error during route optimization", e)
                 _uiEvent.emit(UiEvent.ShowSnackbar("Optimization failed unexpectedly"))
@@ -586,8 +591,8 @@ class RouteViewModel @Inject constructor(
                     if (item is StationItem) {
                         val coords = routeRepository.fetchAndSaveCoordinates(item.id.toLong(), item.name)
                         if (coords != null) {
-                            lat = coords.first
-                            lon = coords.second
+                            lat = coords.latitude
+                            lon = coords.longitude
                         }
                     }
                 }

@@ -1,12 +1,9 @@
 package com.example.stationinspector.data.repository
 
-import com.example.stationinspector.ui.screens.PoiItem
-import kotlinx.coroutines.delay
+import com.example.stationinspector.domain.model.PoiLocation
 import javax.inject.Inject
-
 import retrofit2.http.GET
 import retrofit2.http.Query
-import com.example.stationinspector.BuildConfig
 import java.util.UUID
 
 data class MapyCzResponse(val items: List<MapyCzItem>)
@@ -27,13 +24,13 @@ interface MapyCzApi {
 }
 
 interface MapyCzRepository {
-    suspend fun searchLocation(query: String): List<PoiItem>
+    suspend fun searchLocation(query: String): List<PoiLocation>
 }
 
 class MapyCzRepositoryImpl @Inject constructor(
     private val api: MapyCzApi
 ) : MapyCzRepository {
-    override suspend fun searchLocation(query: String): List<PoiItem> {
+    override suspend fun searchLocation(query: String): List<PoiLocation> {
         if (query.isBlank()) return emptyList()
         val response = api.geocode(query)
         return response.items.map { item ->
@@ -42,10 +39,10 @@ class MapyCzRepositoryImpl @Inject constructor(
             val street = structure?.find { it.type == "regional.street" }?.name
             val addressNum = structure?.find { it.type == "regional.address" }?.name
             val region = structure?.find { it.type == "regional.region" || it.type == "regional.district" }?.name
-            
+
             val addr = listOfNotNull(street, addressNum).joinToString(" ").takeIf { it.isNotBlank() }
 
-            PoiItem(
+            PoiLocation(
                 id = UUID.randomUUID().toString(),
                 name = item.name,
                 city = city,

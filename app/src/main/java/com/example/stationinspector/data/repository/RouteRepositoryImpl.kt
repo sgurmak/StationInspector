@@ -1,22 +1,23 @@
 package com.example.stationinspector.data.repository
 
-import com.example.stationinspector.data.local.dao.StationDao
+import android.util.Log
 import com.example.stationinspector.data.local.dao.RouteCacheDao
+import com.example.stationinspector.data.local.dao.StationDao
 import com.example.stationinspector.data.local.entity.RouteCacheEntity
 import com.example.stationinspector.data.remote.OrsApiService
 import com.example.stationinspector.data.remote.dto.DirectionsRequest
+import com.example.stationinspector.data.remote.dto.JobDto
 import com.example.stationinspector.data.remote.dto.OptimizationRequest
 import com.example.stationinspector.data.remote.dto.VehicleDto
-import com.example.stationinspector.data.remote.dto.JobDto
+import com.example.stationinspector.domain.model.GeoCoordinate
+import com.example.stationinspector.domain.model.OptimizedRoute
+import com.example.stationinspector.domain.model.RouteSegment
+import com.example.stationinspector.domain.model.RouteWaypoint
 import com.example.stationinspector.domain.repository.RouteRepository
-import com.example.stationinspector.domain.repository.RouteData
-import com.example.stationinspector.ui.screens.RouteListItem
-import com.example.stationinspector.utils.PolylineUtils
-import org.osmdroid.util.GeoPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.net.SocketTimeoutException
 import retrofit2.HttpException
+import java.net.SocketTimeoutException
 import javax.inject.Inject
 
 class RouteRepositoryImpl @Inject constructor(
@@ -25,159 +26,95 @@ class RouteRepositoryImpl @Inject constructor(
     private val stationDao: StationDao
 ) : RouteRepository {
 
-    override suspend fun getRouteSegment(lat1: Double, lon1: Double, lat2: Double, lon2: Double): RouteCacheEntity {
+    private companion object {
+        const val TAG = "RouteRepositoryImpl"
+    }
+
+    override suspend fun getRouteSegment(
+        lat1: Double, lon1: Double, lat2: Double, lon2: Double
+    ): RouteSegment {
         val id = "$lat1,$lon1-$lat2,$lon2"
-        
-        // Check cache first
-        val cached = routeCacheDao.getRouteCacheById(id)
-        if (cached != null) {
-            return cached
-        }
-        
-        // If not found, fetch from network
-        // Note: ORS expects coordinates in [longitude, latitude] format
+
+        routeCacheDao.getRouteCacheById(id)?.let { return it.toSegment() }
+
+        // ORS expects coordinates as [longitude, latitude].
         val request = DirectionsRequest(
-            coordinates = listOf(
-                listOf(lon1, lat1),
-                listOf(lon2, lat2)
-            )
+            coordinates = listOf(listOf(lon1, lat1), listOf(lon2, lat2))
         )
-        
-        val response = orsApiService.getDirections(request)
-        val route = response.routes.firstOrNull() 
-            ?: throw Exception("No route found between coordinates")
-            
-        val distance = route.summary.distance
-        val duration = route.summary.duration.toLong()
-        
-        val newSegment = RouteCacheEntity(
+        val route = orsApiService.getDirections(request).routes.firstOrNull()
+            ?: throw IllegalStateException("No route found between coordinates")
+
+        val entity = RouteCacheEntity(
             id = id,
             originLat = lat1,
             originLon = lon1,
             destLat = lat2,
             destLon = lon2,
-            distanceMeters = distance,
-            durationSeconds = duration,
+            distanceMeters = route.summary.distance,
+            durationSeconds = route.summary.duration.toLong(),
             geometry = route.geometry ?: ""
         )
-        
-        // Save to cache
-        routeCacheDao.insertRouteCache(newSegment)
-        
-        return newSegment
+        routeCacheDao.insertRouteCache(entity)
+        return entity.toSegment()
     }
 
-    override suspend fun fetchAndSaveCoordinates(stationId: Long, stationName: String): Pair<Double, Double>? {
-        try {
-            val response = orsApiService.searchGeocode(stationName)
-            val feature = response.features.firstOrNull() ?: return null
-            
+    override suspend fun fetchAndSaveCoordinates(
+        stationId: Long, stationName: String
+    ): GeoCoordinate? {
+        return try {
+            val feature = orsApiService.searchGeocode(stationName).features.firstOrNull()
+                ?: return null
             val lon = feature.geometry.coordinates[0]
             val lat = feature.geometry.coordinates[1]
-            
-            val station = stationDao.getStationByIdSync(stationId)
-            if (station != null) {
+            stationDao.getStationByIdSync(stationId)?.let { station ->
                 stationDao.updateStation(station.copy(latitude = lat, longitude = lon))
             }
-            return Pair(lat, lon)
+            GeoCoordinate(lat, lon)
         } catch (e: Exception) {
-            e.printStackTrace()
-            return null
+            Log.w(TAG, "Geocoding failed for station '$stationName'", e)
+            null
         }
     }
 
-    override suspend fun optimizeAndFetchGeometry(items: List<RouteListItem>): Result<RouteData> = withContext(Dispatchers.IO) {
+    override suspend fun optimizeAndFetchGeometry(
+        waypoints: List<RouteWaypoint>
+    ): Result<OptimizedRoute> = withContext(Dispatchers.IO) {
         try {
-            if (items.size < 2) return@withContext Result.failure(Exception("At least 2 points required"))
+            if (waypoints.size < 2) {
+                return@withContext Result.failure(IllegalArgumentException("At least 2 points required"))
+            }
 
-            val firstItem = items.first()
-            val lastItem = items.last()
-            
-            // Step 1: Map
-            val isRoundTrip = items.size > 2 && 
-                              firstItem.latitude == lastItem.latitude && 
-                              firstItem.longitude == lastItem.longitude
+            val first = waypoints.first()
+            val last = waypoints.last()
+            val isRoundTrip = waypoints.size > 2 &&
+                first.latitude == last.latitude && first.longitude == last.longitude
 
-            val startItem = items.first()
-            val endItem = if (items.size > 1 && isRoundTrip) items.last() else null
-
-            val intermediateItems = items.subList(1, if (endItem != null) items.size - 1 else items.size)
+            val start = first
+            val end = if (isRoundTrip) last else null
+            val intermediate = waypoints.subList(1, if (end != null) waypoints.size - 1 else waypoints.size)
 
             val vehicle = VehicleDto(
                 id = 1,
                 profile = "driving-car",
-                start = listOf(startItem.longitude, startItem.latitude),
-                end = if (endItem != null) listOf(endItem.longitude, endItem.latitude) else null
+                start = listOf(start.longitude, start.latitude),
+                end = end?.let { listOf(it.longitude, it.latitude) }
             )
-
-            val jobs = intermediateItems.mapIndexed { index, item ->
-                JobDto(
-                    id = index + 1, // IDs for mapping back
-                    location = listOf(item.longitude, item.latitude)
-                )
+            val jobs = intermediate.mapIndexed { index, wp ->
+                JobDto(id = index + 1, location = listOf(wp.longitude, wp.latitude))
             }
 
-            val request = OptimizationRequest(
-                jobs = jobs,
-                vehicles = listOf(vehicle)
-            )
+            val steps = orsApiService
+                .getOptimization(OptimizationRequest(jobs = jobs, vehicles = listOf(vehicle)))
+                .routes?.firstOrNull()?.steps
+                ?: throw IllegalStateException("Optimization returned no route")
 
-            // Step 2: Optimize
-            val optimizationResponse = orsApiService.getOptimization(request)
-            val routeSteps = optimizationResponse.routes?.firstOrNull()?.steps 
-                ?: throw Exception("Optimization failed to return routes")
+            // Reconstruct the visiting order from the optimizer's job steps.
+            val sortedIntermediate = steps
+                .filter { it.type == "job" && it.id != null }
+                .mapNotNull { step -> intermediate.getOrNull(step.id!! - 1) }
 
-            // Step 3: Reconstruct
-            val sortedIntermediateJobs = mutableListOf<RouteListItem>()
-
-            // The steps contain "start", "job", "end"
-            for (step in routeSteps) {
-                if (step.type == "job" && step.id != null) {
-                    val jobId = step.id
-                    val originalJob = jobs.find { it.id == jobId }
-                    if (originalJob != null) {
-                        val matchingItem = intermediateItems[jobId - 1]
-                        sortedIntermediateJobs.add(matchingItem)
-                    }
-                }
-            }
-
-            val finalList = listOfNotNull(startItem) + sortedIntermediateJobs + listOfNotNull(endItem)
-            
-            val indexedList = finalList.mapIndexed { index, item ->
-                when (item) {
-                    is com.example.stationinspector.ui.screens.StationItem -> item.copy(orderIndex = index)
-                    is com.example.stationinspector.ui.screens.PoiItem -> item.copy(orderIndex = index)
-                    else -> item
-                }
-            }
-
-            // Step 4: Geometry
-            val directionsCoords = indexedList.map { listOf(it.longitude, it.latitude) }
-            val directionsRequest = DirectionsRequest(coordinates = directionsCoords)
-            
-            val directionsResponse = orsApiService.getDirections(directionsRequest)
-            val route = directionsResponse.routes.firstOrNull() 
-                ?: throw Exception("No route found between coordinates")
-                
-            val geometryString = route.geometry ?: ""
-            val polylinePoints = PolylineUtils.decode(geometryString)
-
-            // Cache it
-            val cacheId = "full_opt_route_${directionsCoords.hashCode()}"
-            val newSegment = RouteCacheEntity(
-                id = cacheId,
-                originLat = firstItem.latitude,
-                originLon = firstItem.longitude,
-                destLat = lastItem.latitude,
-                destLon = lastItem.longitude,
-                distanceMeters = route.summary.distance,
-                durationSeconds = route.summary.duration.toLong(),
-                geometry = geometryString
-            )
-            routeCacheDao.insertRouteCache(newSegment)
-
-            Result.success(RouteData(indexedList, polylinePoints))
+            val ordered = listOf(start) + sortedIntermediate + listOfNotNull(end)
+            Result.success(OptimizedRoute(ordered))
         } catch (e: SocketTimeoutException) {
             Result.failure(Exception("Optimization timeout. The route might be too complex.", e))
         } catch (e: HttpException) {
@@ -186,4 +123,7 @@ class RouteRepositoryImpl @Inject constructor(
             Result.failure(e)
         }
     }
+
+    private fun RouteCacheEntity.toSegment() =
+        RouteSegment(distanceMeters = distanceMeters, durationSeconds = durationSeconds, geometry = geometry)
 }
