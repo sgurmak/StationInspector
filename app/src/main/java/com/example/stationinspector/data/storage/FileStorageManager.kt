@@ -67,4 +67,23 @@ class FileStorageManager @Inject constructor(
     suspend fun doesFileExist(filePath: String): Boolean = withContext(Dispatchers.IO) {
         return@withContext File(filePath).exists()
     }
+
+    /**
+     * Deletes every stored photo file (the flat `*.jpg` files in filesDir).
+     * Photo files are not foreign-key cascaded, so wiping the database leaves
+     * them orphaned on disk — this sweep frees that space. Also recovers any
+     * pre-existing orphans that earlier delete paths failed to remove.
+     *
+     * @return the number of files deleted.
+     */
+    suspend fun clearAllPhotoFiles(): Int = withContext(Dispatchers.IO) {
+        val files = context.filesDir.listFiles { file ->
+            file.isFile && file.name.endsWith(".jpg", ignoreCase = true)
+        } ?: return@withContext 0
+
+        var deleted = 0
+        files.forEach { if (it.delete()) deleted++ }
+        Log.d(TAG, "Cleared $deleted photo file(s) from storage")
+        return@withContext deleted
+    }
 }

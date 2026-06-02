@@ -17,6 +17,7 @@ import com.example.stationinspector.data.repository.RoomTransactionRunner
 import com.example.stationinspector.data.repository.RouteRepositoryImpl
 import com.example.stationinspector.data.repository.ShortcutRepositoryImpl
 import com.example.stationinspector.data.repository.StationRepositoryImpl
+import com.example.stationinspector.data.storage.FileStorageManager
 import com.example.stationinspector.domain.repository.PoiRepository
 import com.example.stationinspector.domain.repository.PreferencesRepository
 import com.example.stationinspector.domain.repository.RouteRepository
@@ -98,9 +99,10 @@ object DatabaseModule {
     fun provideStationRepository(
         stationDao: StationDao,
         photoDao: PhotoDao,
+        fileStorageManager: FileStorageManager,
         @ApplicationContext context: Context
     ): StationRepository {
-        return StationRepositoryImpl(stationDao, photoDao, context)
+        return StationRepositoryImpl(stationDao, photoDao, fileStorageManager, context)
     }
 
     @Provides

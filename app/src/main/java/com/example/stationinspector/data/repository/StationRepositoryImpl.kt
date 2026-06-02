@@ -5,6 +5,7 @@ import com.example.stationinspector.data.local.dao.PhotoDao
 import com.example.stationinspector.data.local.dao.StationDao
 import com.example.stationinspector.data.mapper.toDomain
 import com.example.stationinspector.data.mapper.toEntity
+import com.example.stationinspector.data.storage.FileStorageManager
 import com.example.stationinspector.domain.model.Photo
 import com.example.stationinspector.domain.model.Station
 import com.example.stationinspector.domain.model.StationWithSplitCountsDomain
@@ -20,6 +21,7 @@ import javax.inject.Inject
 class StationRepositoryImpl @Inject constructor(
     private val stationDao: StationDao,
     private val photoDao: PhotoDao,
+    private val fileStorageManager: FileStorageManager,
     @ApplicationContext private val context: Context
 ) : StationRepository {
 
@@ -79,7 +81,11 @@ class StationRepositoryImpl @Inject constructor(
     }
 
     override suspend fun clearAllData() {
-        // Photos first — they hold a FK reference to stations
+        // Delete photo files first — they are NOT foreign-key cascaded, so
+        // removing only the rows would orphan the JPEGs on disk (the storage
+        // leak that left ~GBs behind after an in-app "clear").
+        fileStorageManager.clearAllPhotoFiles()
+        // Then the rows (photos hold a FK to stations, so photos before stations).
         photoDao.deleteAllPhotos()
         stationDao.deleteAllStations()
     }
