@@ -2,7 +2,6 @@ package com.example.stationinspector.data.local.dao
 
 import androidx.room.*
 import com.example.stationinspector.data.local.entity.StationEntity
-import com.example.stationinspector.data.local.entity.StationWithPhotoCount
 import com.example.stationinspector.data.local.entity.StationWithSplitCounts
 import kotlinx.coroutines.flow.Flow
 
@@ -13,14 +12,6 @@ interface StationDao {
 
     @Query("SELECT * FROM stations")
     suspend fun getAllStationsSync(): List<StationEntity>
-
-    @Query("""
-        SELECT s.*, COUNT(p.id) as photoCount 
-        FROM stations s 
-        LEFT JOIN photos p ON s.id = p.stationId 
-        GROUP BY s.id
-    """)
-    fun getStationsWithPhotoCount(): Flow<List<StationWithPhotoCount>>
 
     /**
      * Returns each station with two split photo counts:

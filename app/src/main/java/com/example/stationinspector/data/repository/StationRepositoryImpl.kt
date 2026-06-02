@@ -10,8 +10,10 @@ import com.example.stationinspector.domain.model.Station
 import com.example.stationinspector.domain.model.StationWithSplitCountsDomain
 import com.example.stationinspector.domain.repository.StationRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import javax.inject.Inject
 
@@ -82,12 +84,13 @@ class StationRepositoryImpl @Inject constructor(
         stationDao.deleteAllStations()
     }
 
-    override suspend fun seedCoordinatesIfMissing() {
+    override suspend fun seedCoordinatesIfMissing() = withContext(Dispatchers.IO) {
         val stations = stationDao.getAllStationsSync()
         if (stations.any { it.latitude == 0.0 && it.longitude == 0.0 }) {
+            // Asset read + JSON parse are blocking — keep them off the caller's thread.
             val jsonString = context.assets.open("stations.json").bufferedReader().use { it.readText() }
             val jsonObject = JSONObject(jsonString)
-            
+
             val updatedStations = stations.map { station ->
                 if (station.latitude == 0.0 && station.longitude == 0.0 && jsonObject.has(station.name)) {
                     val coords = jsonObject.getJSONObject(station.name)

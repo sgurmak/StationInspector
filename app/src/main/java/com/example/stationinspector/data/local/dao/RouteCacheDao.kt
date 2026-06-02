@@ -13,7 +13,4 @@ interface RouteCacheDao {
 
     @Query("SELECT * FROM route_cache WHERE id = :id")
     suspend fun getRouteCacheById(id: String): RouteCacheEntity?
-
-    @Query("SELECT * FROM route_cache WHERE originLat = :originLat AND originLon = :originLon AND destLat = :destLat AND destLon = :destLon")
-    suspend fun getRouteCacheByCoordinates(originLat: Double, originLon: Double, destLat: Double, destLon: Double): RouteCacheEntity?
 }

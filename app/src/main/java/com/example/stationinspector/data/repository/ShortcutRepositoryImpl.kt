@@ -3,6 +3,7 @@ package com.example.stationinspector.data.repository
 import com.example.stationinspector.data.local.dao.ShortcutDao
 import com.example.stationinspector.data.local.entity.ShortcutEntity
 import com.example.stationinspector.data.mapper.toDomain
+import com.example.stationinspector.data.mapper.toEntity
 import com.example.stationinspector.domain.model.PoiLocation
 import com.example.stationinspector.domain.model.Shortcut
 import com.example.stationinspector.domain.repository.ShortcutRepository
@@ -25,17 +26,7 @@ class ShortcutRepositoryImpl @Inject constructor(
     override suspend fun count(): Int = dao.getShortcutCount()
 
     override suspend fun insertAll(shortcuts: List<Shortcut>) {
-        val entities = shortcuts.map { shortcut ->
-            ShortcutEntity(
-                id          = shortcut.id,
-                label       = shortcut.label,
-                customName  = shortcut.customName,
-                poiItemJson = shortcut.location?.let { gson.toJson(it) },
-                isNew       = shortcut.isNew,
-                isRoundTrip = shortcut.isRoundTrip
-            )
-        }
-        dao.insertShortcuts(entities)
+        dao.insertShortcuts(shortcuts.map { it.toEntity(gson) })
     }
 
     override suspend fun updateShortcut(
