@@ -18,5 +18,12 @@ data class Shortcut(
     companion object {
         const val ID_HOME = "1"
         const val ID_WORK = "2"
+
+        /** Sentinel id used by the UI to mean "create a brand-new shortcut". */
+        const val ID_NEW = "NEW"
+
+        /** Canonical display names / route-point names for the fixed shortcuts. */
+        const val NAME_HOME = "Home"
+        const val NAME_WORK = "Work"
     }
 }

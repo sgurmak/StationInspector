@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.stationinspector.domain.model.Shortcut
 import com.example.stationinspector.ui.components.MapWidget
 import org.burnoutcrew.reorderable.rememberReorderableLazyListState
 import org.burnoutcrew.reorderable.reorderable
@@ -160,7 +161,7 @@ fun MapScreenContent(
             shortcutId = shortcutId,
             poi = poi,
             onConfirm = { confirmName ->
-                if (shortcutId == "NEW") {
+                if (shortcutId == Shortcut.ID_NEW) {
                     onCreateNewShortcut(poi, confirmName)
                 } else {
                     onUpdateShortcut(shortcutId, poi, confirmName)
@@ -321,7 +322,7 @@ fun MapScreenContent(
                             
                             Spacer(modifier = Modifier.height(16.dp))
                             
-                            if (editingShortcut!!.id == "1") {
+                            if (editingShortcut!!.id == Shortcut.ID_HOME) {
                                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
                                     Text("Round Trip (Start & End)", color = Color.White, modifier = Modifier.weight(1f))
                                     Switch(
@@ -443,7 +444,7 @@ fun MapScreenContent(
                                 },
                                 onShortcutLongClick = { shortcut -> editingShortcut = shortcut },
                                 onAddNewClick = {
-                                    activeShortcutSearchId = "NEW"
+                                    activeShortcutSearchId = Shortcut.ID_NEW
                                     pendingShortcutActivation = true
                                     focusRequester.requestFocus()
                                 },
@@ -962,7 +963,7 @@ fun ShortcutsRow(
     onAddNewClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val sortedShortcuts = shortcuts.sortedWith(compareBy({ it.id != "1" && it.id != "2" }, { it.id }))
+    val sortedShortcuts = shortcuts.sortedWith(compareBy({ it.id != Shortcut.ID_HOME && it.id != Shortcut.ID_WORK }, { it.id }))
     LazyRow(
         contentPadding = PaddingValues(start = 14.dp, end = 14.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -972,8 +973,8 @@ fun ShortcutsRow(
             val label = shortcut.customName ?: shortcut.label
             val icon = when {
                 shortcut.poiItem == null -> Icons.Default.Add
-                shortcut.label == "Home" -> Icons.Default.Home
-                shortcut.label == "Work" -> Icons.Default.Work
+                shortcut.label == Shortcut.NAME_HOME -> Icons.Default.Home
+                shortcut.label == Shortcut.NAME_WORK -> Icons.Default.Work
                 else -> Icons.Default.Place
             }
 

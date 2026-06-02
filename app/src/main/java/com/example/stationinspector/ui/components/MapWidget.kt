@@ -2,6 +2,7 @@ package com.example.stationinspector.ui.components
 
 import android.preference.PreferenceManager
 import com.example.stationinspector.BuildConfig
+import com.example.stationinspector.domain.model.Shortcut
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
@@ -194,8 +195,8 @@ fun MapWidget(
             // the polyline and all other markers.
             val validItems = routeItems.filter { it.latitude != 0.0 && it.longitude != 0.0 && it.stableId != editingPoi?.stableId }
             val isRoundTrip = !isMiniMap && validItems.size >= 2 &&
-                              validItems.first().name == "Home" &&
-                              validItems.last().name == "Home"
+                              validItems.first().name == Shortcut.NAME_HOME &&
+                              validItems.last().name == Shortcut.NAME_HOME
 
             var highlightedMarker: org.osmdroid.views.overlay.Marker? = null
             validItems.forEachIndexed { index, item ->

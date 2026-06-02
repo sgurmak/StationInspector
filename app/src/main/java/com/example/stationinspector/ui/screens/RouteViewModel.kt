@@ -60,8 +60,9 @@ class RouteViewModel @Inject constructor(
 
     private companion object {
         const val TAG = "RouteViewModel"
-        const val NAME_HOME = "Home"
-        const val NAME_WORK = "Work"
+        // Single source of truth lives on the domain Shortcut model.
+        const val NAME_HOME = Shortcut.NAME_HOME
+        const val NAME_WORK = Shortcut.NAME_WORK
     }
 
     val isRoundTripEnabled: StateFlow<Boolean> = preferencesRepository.isRoundTripEnabled
