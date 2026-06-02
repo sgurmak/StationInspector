@@ -18,7 +18,7 @@ import com.example.stationinspector.data.local.dao.ShortcutDao
 @Database(
     entities = [StationEntity::class, PhotoEntity::class, RouteCacheEntity::class, PoiEntity::class, ShortcutEntity::class],
     version = 8,
-    exportSchema = false
+    exportSchema = true
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {

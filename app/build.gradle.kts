@@ -64,6 +64,12 @@ android {
     }
 }
 
+// Export the Room schema so future migrations can be verified with
+// MigrationTestHelper and reviewed in version control.
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

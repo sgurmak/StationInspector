@@ -3,6 +3,7 @@ package com.example.stationinspector.di
 import android.app.Application
 import androidx.room.Room
 import android.content.Context
+import com.example.stationinspector.BuildConfig
 import com.example.stationinspector.data.local.AppDatabase
 import com.example.stationinspector.data.local.dao.PhotoDao
 import com.example.stationinspector.data.local.dao.StationDao
@@ -46,7 +47,12 @@ object DatabaseModule {
             AppDatabase.DATABASE_NAME
         )
         .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7, AppDatabase.MIGRATION_7_8)
-        .fallbackToDestructiveMigration()
+        .apply {
+            // Destructive fallback only in debug builds. A release build must
+            // never silently wipe inspection data — a missing migration path
+            // should surface as a crash to investigate, not as data loss.
+            if (BuildConfig.DEBUG) fallbackToDestructiveMigration()
+        }
         .build()
     }
 
