@@ -14,40 +14,42 @@
 |---|---|
 | Мова / SDK | Kotlin 2.0, minSdk 26, targetSdk 35 |
 | UI | Jetpack Compose + Material 3 |
-| DI | Hilt 2.52 |
-| БД | Room 2.6.1 (5 таблиць, 8 міграцій) |
+| DI | Hilt 2.52 (4 модулі) |
+| БД | Room 2.6.1 (5 таблиць, 8 міграцій, `exportSchema=true`) |
 | Мережа | Retrofit 2.9 + OkHttp 4.12 (ORS + Mapy.cz) |
-| Камера | CameraX 1.4 |
-| Мапи | osmdroid 6.1.18 + Mapy.cz tiles |
+| Камера | CameraX 1.4 (Preview + ImageCapture) |
+| Мапи | osmdroid 6.1.18 + Mapy.cz tiles (7-денний кеш) |
 | Фон | WorkManager 2.10 |
+| Тести | JUnit + Robolectric + mockk + coroutines-test |
 
 Деталі: [.claude/tech_stack.md](../.claude/tech_stack.md).
 
 ## Архітектура (одним абзацом)
-Clean Architecture, 3 шари, package-by-layer, один модуль `:app`.
-`Compose → @HiltViewModel (StateFlow) → Repository (interface) → DAO / ApiService`.
-DI — три Hilt-модулі: `AppModule`, `DatabaseModule`, `NetworkModule`.
+Clean Architecture, package-by-layer, один модуль `:app`. **Правило залежностей дотримано**: `domain/` не залежить від `data`/`ui`/`osmdroid`; репозиторії повертають domain-моделі.
+`Compose → @HiltViewModel (StateFlow) → UseCase / Repository (interface) → DAO / ApiService`.
+DI — **чотири** Hilt-модулі: `AppModule`, `DatabaseModule`, `NetworkModule`, `DispatchersModule`.
 Деталі: [.claude/architecture.md](../.claude/architecture.md).
 
 ## Карта пакетів
 ```
 com.example.stationinspector/
-├── di/          ← 3 Hilt-модулі
-├── domain/      ← model + repository interfaces
-├── data/        ← local (Room) + remote (Retrofit) + repository impls + storage
+├── di/          ← 4 Hilt-модулі (+ @IoDispatcher)
+├── domain/      ← model + repository interfaces + usecase
+├── data/        ← local (Room) + remote (Retrofit) + repository impls + mapper + storage
 ├── camera/      ← CameraXController, ImageCompressor
 ├── worker/      ← ExportZipWorker
-├── utils/       ← PolylineUtils
-└── ui/          ← screens, inspection, export, zone (legacy), navigation, theme
+├── utils/       ← PolylineUtils, MapNavigation
+└── ui/          ← screens (4 route VMs), inspection, export, navigation, components, theme
 ```
+`ui/zone/` (legacy) і монолітний `StationListViewModel` — **видалено**.
 
-## ⚠️ Найкритичніший борг (must read)
-1. **Hardcoded API keys** — [ВИРІШЕНО] Перенесено до `local.properties` → `BuildConfig`.
-2. **`fallbackToDestructiveMigration()`** — [DatabaseModule.kt:41](../app/src/main/java/com/example/stationinspector/di/DatabaseModule.kt) → видаляє дані юзера.
-3. **Немає тестів** — лише boilerplate.
-4. **`StationListViewModel`** ламає clean architecture (інжектить DAO напряму).
+## ⚠️ Статус критичного боргу (must read)
+1. **Hardcoded API keys** — ВИРІШЕНО (`local.properties` → `BuildConfig`).
+2. **`fallbackToDestructiveMigration()`** — ВИРІШЕНО для release: тепер **лише debug**; `MIGRATION_7_8` додає `shortcuts.isRoundTrip`, покрито `MigrationTest`.
+3. **Тести** — ~39 юніт-тестів (pure logic, мапери, **Robolectric Room**, міграція, `RouteViewModel`).
+4. **`StationListViewModel`** — ВИРІШЕНО: розбито на 4 VM + репозиторії/use cases; DAO в UI немає.
 
-Повний список: [.claude/technical_debt.md](../.claude/technical_debt.md).
+Повний список і залишок: [.claude/technical_debt.md](../.claude/technical_debt.md).
 
 ## Корисні точки входу в код
 - `MainActivity.kt`, `StationInspectorApplication.kt` — старт.

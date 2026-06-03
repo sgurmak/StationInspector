@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| **Name** | StationInspector |
+| **Name** | StationInspector (display name / branding: **FleetWay**) |
 | **Package** | `com.example.stationinspector` |
 | **Type** | Native Android (Kotlin) |
 | **UI Framework** | Jetpack Compose + Material 3 |

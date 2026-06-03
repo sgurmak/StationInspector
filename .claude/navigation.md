@@ -34,14 +34,24 @@ station_list?banner={banner}          ← START DESTINATION (MainAppScreen)
 
 ## Tab Navigation (within MainAppScreen)
 
-Tabs are NOT separate nav routes. They switch via local `currentTab` state:
+Tabs are NOT separate nav routes. They switch via local `currentTab` state, held
+in `rememberSaveable` (survives process death / config change). `MainTab` is a
+Serializable enum. The bottom bar is a Material 3 `NavigationBar`.
 
-| Tab Index | Label | Screen Composable | ViewModel |
+Each screen resolves its own ViewModels via `hiltViewModel()`. Because all tab
+content shares the `station_list` `NavBackStackEntry` (it's rendered inside
+`MainAppScreen`), `RouteViewModel` is the **same instance** across the Work and
+Map tabs — preserving route/date state without prop-drilling.
+
+| Tab Index | Label | Screen Composable | ViewModels |
 |---|---|---|---|
-| 0 | Work | `StationListScreen` | Shared `StationListViewModel` |
-| 1 | Map | `MapScreen` | Shared `StationListViewModel` |
-| 2 | Export | `ExportScreen` | Own `ExportViewModel` |
-| 3 | Settings | `SettingsScreen` | Shared `StationListViewModel` |
+| 0 | Work | `StationListScreen` | `RouteViewModel` + `SettingsViewModel` (loading/snackbar host) |
+| 1 | Map | `MapScreen` | `RouteViewModel` + `SearchViewModel` + `ShortcutsViewModel` |
+| 2 | Export | `ExportScreen` | `ExportViewModel` (date from `RouteViewModel`) |
+| 3 | Settings | `SettingsScreen` | `SettingsViewModel` |
+
+A cold-start `SplashScreen` (FleetWay branding) overlays the Work destination
+until its animation completes (`rememberSaveable` showSplash flag in `NavGraph`).
 
 ## Navigation Entry Points
 

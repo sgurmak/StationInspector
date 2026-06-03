@@ -2,18 +2,20 @@
 
 ## MainAppScreen
 - **File**: `app/src/main/java/com/example/stationinspector/ui/screens/MainAppScreen.kt`
-- **Role**: Root composable. Owns the Scaffold, vertical gradient background (#392153 → #13111A), and 4-tab BottomNavBar.
-- **ViewModel**: Creates shared `StationListViewModel` via `hiltViewModel()` and passes it to child tab screens.
+- **Role**: Root composable. Owns the Scaffold, vertical gradient background (`AppGradientTop`→`AppGradientBottom`), and the Material 3 `NavigationBar` (4 tabs). `currentTab` is `rememberSaveable`.
+- **ViewModel**: resolves `RouteViewModel` for the selected date (Export tab needs it); child tab screens resolve their own ViewModels via `hiltViewModel()` (same `NavBackStackEntry` → shared `RouteViewModel`).
 
 ## StationListScreen (Tab 0: Work)
 - **File**: `app/src/main/java/com/example/stationinspector/ui/screens/StationListScreen.kt`
 - **Role**: Main work view. Horizontal calendar date selector, collapsible mini map widget with route stats (distance/time/stops), and a scrollable list of station cards and POI cards for the selected date.
-- **Key components**: `CalendarRow`, `MapWidget` (non-interactive), `StationCard` (with photo/issue counts + nav button), `PoiCard`, success snackbar banner.
+- **Key components**: `CalendarRow`, `MapWidget` (non-interactive; **mounted only while expanded** — collapsed it would render invisibly behind the info bar and waste battery), `StationCard`/`PoiCard` (both built on a shared `RouteCardScaffold`), success snackbar banner.
+- **ViewModels**: `RouteViewModel` + `SettingsViewModel` (this screen hosts the SnackbarHost + loading overlay for import/clear).
 
 ## MapScreen (Tab 1: Map)
 - **File**: `app/src/main/java/com/example/stationinspector/ui/screens/MapScreen.kt`
 - **Role**: Full interactive map with bottom sheet. Top bar shows route info (distance/time/stops). Bottom sheet contains: search box (Mapy.cz geocoding), shortcut quick-actions (Home/Work/custom), reorderable station/POI list with swipe-to-dismiss (hide stations, delete POIs). "Optimize" button triggers VROOM route optimization. POI coordinate editing mode with draggable pin.
-- **Key features**: `BottomSheetScaffold`, `ReorderableMapList` (drag-and-drop), shortcut management dialogs, coordinate editing with confirmation dialog for stations.
+- **Key features**: `BottomSheetScaffold`, `ReorderableMapList` (drag-and-drop), shortcut management dialogs, coordinate editing with confirmation dialog. Stateless sub-composables `SearchResultsList` and `ShortcutsRow` were extracted (each with a `@Preview`); the inline `ShortcutEditSheet` remains.
+- **ViewModels**: `RouteViewModel` + `SearchViewModel` + `ShortcutsViewModel` (the screen clears the search after add-to-route).
 
 ## SettingsScreen (Tab 3: Settings)
 - **File**: `app/src/main/java/com/example/stationinspector/ui/screens/SettingsScreen.kt`
@@ -37,16 +39,11 @@
 ## MapWidget (Reusable Component)
 - **File**: `app/src/main/java/com/example/stationinspector/ui/components/MapWidget.kt`
 - **Role**: Reusable osmdroid map wrapped in `AndroidView`. Renders Mapy.cz tiles, numbered station markers (purple teardrop pins), route polylines (dark outline + purple main line with direction arrows). Used in both StationListScreen (non-interactive, collapsible) and MapScreen (interactive, full-size).
-- **Props**: routeItems, routeInfo, isMapExpanded, editingPoi, isInteractive, bottomPaddingPx, safeMarginPx
+- **Props**: routeItems, routeInfo, isMapExpanded, editingPoi, isInteractive, isMiniMap, highlightedItemIndex, top/bottomPaddingPx, safeMarginPx
+- **Perf**: osmdroid is configured once (not per recomposition); route overlays rebuild only in a keyed `LaunchedEffect` (not on every recompose); the inactive mini-marker bitmap is cached and reused.
 
-## ZoneListScreen (Legacy)
-- **File**: `app/src/main/java/com/example/stationinspector/ui/zone/ZoneListScreen.kt`
-- **Role**: Older zone-by-zone inspection screen with Ukrainian labels (Вокзал, Зона очікування, WC). Shows per-zone photo/issue counts with camera action buttons. Has "Підтвердити інспекцію" (Confirm inspection) bottom bar.
-- **ViewModel**: `ZoneListViewModel`
-- **Status**: Legacy — superseded by the Camera/Gallery flow but still in codebase.
+## SplashScreen
+- **File**: `app/src/main/java/com/example/stationinspector/ui/screens/SplashScreen.kt`
+- **Role**: Cold-start FleetWay branding (animated logo + gradient text) overlaid on the Work destination until its animation completes, then dismissed via a `rememberSaveable` flag in `NavGraph`.
 
-## ZoneGalleryScreen (Legacy)
-- **File**: `app/src/main/java/com/example/stationinspector/ui/inspection/ZoneGalleryScreen.kt`
-- **Role**: Older zone gallery with Ukrainian labels. Category tabs for "Звичайні фото" / "Косяки". Photo grid with delete buttons. "Додати фото" bottom button.
-- **ViewModel**: `ZoneInspectionViewModel`
-- **Status**: Legacy — superseded by GalleryScreen but still in codebase.
+> The legacy `ui/zone/ZoneListScreen` + `ZoneGalleryScreen` (Ukrainian-label inspection path) were **removed**. The only inspection flow is Camera → Gallery (Czech zone labels).

@@ -3,9 +3,11 @@
 ## API 1: OpenRouteService (ORS)
 
 - **Base URL**: `https://api.openrouteservice.org/`
-- **Auth**: API key in `Authorization` header (Base64 string hardcoded in `NetworkModule.kt`)
+- **Auth**: API key in the `Authorization` header from `BuildConfig.ORS_API_KEY` (sourced from `local.properties` — not hardcoded)
 - **Timeouts**: connect 45s, read 45s
+- **Logging**: `HttpLoggingInterceptor.Level.BODY` **only in debug** (`BuildConfig.DEBUG`); `Level.NONE` in release so keys/payloads never hit Logcat
 - **DI**: `NetworkModule` → OkHttpClient → Retrofit → `OrsApiService`
+- **Return types**: `RouteRepository` maps ORS responses to **domain** types (`RouteSegment`, `OptimizedRoute`, `GeoCoordinate`) — no DTOs/entities leak out. The order reconstruction is the pure, tested `reconstructOptimizedOrder`.
 
 ### Endpoints
 
@@ -31,7 +33,9 @@
 
 - **Base URL**: `https://api.mapy.cz/`
 - **Auth**: API key as `apikey` query parameter (from `local.properties` → `BuildConfig.MAPY_CZ_API_KEY`)
+- **Timeouts**: connect 45s, read 45s (aligned with ORS); body logging DEBUG-gated
 - **DI**: `AppModule` → separate OkHttpClient (auth interceptor) → Retrofit → `MapyCzApi`
+- **Return type**: `MapyCzRepository.searchLocation(query)` returns `List<PoiLocation>` (domain), not a UI model; the UI maps `PoiLocation` → `PoiItem`.
 
 ### Endpoints
 
@@ -59,10 +63,10 @@ MapyCzResponse
 ## API 3: Mapy.cz Map Tiles
 
 - **URL pattern**: `https://api.mapy.cz/v1/maptiles/basic/256/{z}/{x}/{y}?apikey=...`
-- **Auth**: API key hardcoded directly in `MapWidget.kt`
+- **Auth**: API key from `BuildConfig.MAPY_CZ_API_KEY` (in `MapWidget.kt`'s tile source — not hardcoded)
 - **Consumer**: osmdroid's custom `OnlineTileSourceBase`
-- **Zoom range**: 0–19
-- **Tile size**: 256px PNG
+- **Zoom range**: 0–19; **Tile size**: 256px PNG
+- **Cache**: 7-day tile expiration (`Configuration.expirationOverrideDuration`) so panning the same area doesn't re-download tiles (battery/network)
 
 ### Map Configuration (osmdroid)
 

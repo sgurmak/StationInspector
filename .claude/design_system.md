@@ -2,20 +2,25 @@
 
 ## Color Palette
 
+Semantic tokens live in `ui/theme/Color.kt`. Per-screen pure-rename aliases were
+removed (e.g. MapScreen uses tokens directly); a few semantic local aliases
+remain (e.g. `CardBg`, `DateCircleSel`).
+
 | Token | Hex | Usage |
 |---|---|---|
 | `AppGradientTop` | `#392153` | Background gradient start |
-| `AppGradientBottom` | `#13111A` | Background gradient end |
-| `NavBarBg` | `#13111B` | Bottom nav bar, sheet backgrounds |
+| `AppGradientBottom` | `#13111B` | Background gradient end |
+| `ContentDark` | `#13111B` | Core dark surface (nav bar, sheet backgrounds) |
 | `ContentLight` | `#FBF7FF` | Primary text/icons on dark backgrounds |
-| `CardContent` / `ContentDark` | `#261937` | Text/icons on light card backgrounds |
-| `CardBg` | `#FBF7FF` | Station/POI card backgrounds |
-| `AccentRed` / `WarningRed` | `#CA065E` | Defect counts, destructive actions, accent color |
-| `AccentGreen` | `#4ADE80` | Confirmation indicators, done buttons |
-| `SuccessGreen` | `#16A34A` | Snackbar success, confirm inspection button |
-| `RoutePurple` | `#8B5CF6` | Map polyline, numbered marker pins |
-| `DateCircleSel` | `#261937` | Selected date circle background |
-| `DateCircleUnsel` | `#FBF7FF` | Unselected date circle background |
+| `ContentLightSecondary` | `#F5EDFF` | Muted lavender text/details |
+| `CardContent` | `#261937` | Text/icons on light card backgrounds |
+| `AccentPink` | `#CA065E` | Defect counts, destructive/accent (StationListScreen alias `WarningAccent`) |
+| `AccentGreen` | `#4ADE80` | Camera confirm/active green |
+| `AccentGreenAlt` | `#16A34A` | Snackbar success / confirm-inspection |
+| `AccentGreenConfirm` | `#00C853` | Map edit confirm action |
+| `DestructiveBg` | `#FFD3EB` | Clear-storage button surface |
+| `BrandViolet`/`BrandLavender`/`SplashGradient*` | — | FleetWay splash branding |
+| (route line in `MapWidget`) | `#8B5CF6` | Polyline + numbered marker pins (literal, drawing code) |
 
 ## Typography
 
@@ -61,17 +66,17 @@
 
 ---
 
-## File Counts
+## File Counts (approximate — verify against source)
 
 | Category | Count |
 |---|---|
-| Kotlin source files | 53 |
-| Room entities | 7 (5 tables + 2 result classes) |
+| Kotlin source files (main) | ~70 |
+| Room entities | 6 (5 tables + 1 result class `StationWithSplitCounts`) |
 | Room DAOs | 5 |
-| ViewModels | 4 |
-| Composable screens | 10 |
-| DI modules | 3 |
+| ViewModels | 6 (Route/Search/Shortcuts/Settings + ZoneInspection + Export) |
+| Use cases | 3 (StationNameCleaner, ParseStationsCsv, ImportStations) |
+| DI modules | 4 (App, Database, Network, Dispatchers) |
 | Hilt workers | 1 |
-| DB migrations | 8 |
+| DB migrations | 8 (`exportSchema = true`) |
 | API services | 2 (ORS + Mapy.cz) |
-| Network DTOs | 10 |
+| Unit tests | ~39 (incl. Robolectric Room + migration + VM) |
