@@ -1,126 +1,41 @@
 # ViewModels
 
-## StationListViewModel
+The former monolithic `StationListViewModel` was split into four focused
+ViewModels in `ui/screens/`. UI models (`RouteListItem`/`StationItem`/`PoiItem`,
+`StationWithCounts`, `DailyRouteInfo`, `ShortcutUiModel`, `SearchUiState`,
+`UiEvent`) and the UI↔domain mappers now live in `ui/screens/RouteModels.kt`.
 
-- **File**: `app/src/main/java/com/example/stationinspector/ui/screens/StationListViewModel.kt`
-- **Scope**: Shared across Work (Tab 0), Map (Tab 1), and Settings (Tab 3) tabs
-- **Size**: ~700 lines (largest ViewModel)
+## RouteViewModel
+- **File**: `ui/screens/RouteViewModel.kt`
+- **Scope**: shared instance across the Work and Map tabs (same `NavBackStackEntry`).
+- **Injects**: `StationRepository`, `RouteRepository`, `PoiRepository`, `PreferencesRepository`, `ShortcutRepository`, `TransactionRunner`, `@IoDispatcher CoroutineDispatcher`. (No DAOs, no `AppDatabase`, no `Dispatchers.IO` hardcoded.)
+- **State**: `selectedDate`, `availableDates`, `routeItems`, `stableRouteDate`, `routeInfo`, `isExportButtonEnabled`, `editingPoi`, `isOptimizing`, `isRoundTripEnabled`, `mapExpandedByDate`, `uiEvent` (snackbars).
+- **Operations**: `onDateSelected`, `setRoundTripEnabled`, `optimizeRoute` (maps items→`RouteWaypoint`, applies the optimized order back by id+isStation), `addPoiToRoute`, `addShortcutToRoute` (Home/round-trip logic), `toggleHidePoi`, `deletePoi`, `startEditingPoi`/`cancelEditingPoi`/`saveEditedPoi`, `reorderItems`, scroll persistence, `toggleMapExpanded`, `onInspectionConfirmed`. Private `rebuildHomePointsAndIndices`/`insertPoiAtCorrectOrderIndex`/`calculateDailyRoute`.
 
-### Injected Dependencies
-- `StationRepository` (domain interface)
-- `RouteRepository` (domain interface)
-- `MapyCzRepository` (data layer — breaks clean arch)
-- `ShortcutDao` (data layer — breaks clean arch)
-- `PoiDao` (data layer — breaks clean arch)
-- `StationDao` (data layer — breaks clean arch)
-- `DataStore<Preferences>`
+## SearchViewModel
+- **File**: `ui/screens/SearchViewModel.kt` — **Injects**: `MapyCzRepository`.
+- **State**: `searchQuery`, `searchState` (Idle/Loading/Success/Error). Debounced 300ms; maps `PoiLocation`→`PoiItem` for the UI.
+- **Operations**: `onSearchQueryChanged`, `clearSearch`.
 
-### State (StateFlow)
-| State | Type | Description |
-|---|---|---|
-| `selectedDate` | `LocalDate?` | Currently selected work day |
-| `availableDates` | `List<LocalDate>` | All dates with assigned stations |
-| `routeItems` | `List<RouteListItem>` | Combined stations + POIs for selected date, sorted by orderIndex |
-| `routeInfo` | `DailyRouteInfo` | Total distance/time/stops + polyline points |
-| `isExportButtonEnabled` | `Boolean` | True when there are photos to export |
-| `isLoading` | `Boolean` | CSV import / clear data in progress |
-| `isOptimizing` | `Boolean` | Route optimization in progress |
-| `searchQuery` | `String` | Current Mapy.cz search text |
-| `searchState` | `SearchUiState` | Idle / Loading / Success(results) / Error(message) |
-| `editingPoi` | `RouteListItem?` | POI being coordinate-edited on map |
-| `shortcuts` | `List<ShortcutEntity>` | Quick-action shortcuts |
-| `isRoundTripEnabled` | `Boolean` | Home round-trip toggle (DataStore) |
+## ShortcutsViewModel
+- **File**: `ui/screens/ShortcutsViewModel.kt` — **Injects**: `ShortcutRepository`.
+- **State**: `shortcuts: List<ShortcutUiModel>`. Seeds Home/Work on init (`ensureDefaults`).
+- **Operations**: `updateShortcut`, `createNewShortcut`, `deleteShortcut` (Home/Work id `"1"`/`"2"` kept but cleared; constants on `Shortcut.ID_HOME/ID_WORK/ID_NEW/NAME_HOME/NAME_WORK`).
 
-### Operations
-- `onDateSelected(date)` — switch active work day
-- `importStationsFromCsv(context, uri)` — parse CSV, clean names, deduplicate, save, seed coordinates
-- `clearAllData()` — delete all stations and photos
-- `optimizeRoute()` — send active items to VROOM, update order in DB
-- `addPoiToRoute(poi)` — add search result as POI for current date
-- `addShortcutToRoute(shortcutId, poi)` — add shortcut POI (with Home round-trip logic)
-- `toggleHidePoi(id)` — hide/show item from route calculation
-- `deletePoi(id)` — remove POI from DB
-- `startEditingPoi(poi)` / `cancelEditingPoi()` / `saveEditedPoi(poi, lat, lon)` — coordinate editing flow
-- `updateShortcut(id, poi, customName)` / `createNewShortcut(poi, customName)` / `deleteShortcut(id)` — shortcut CRUD
-- `setRoundTripEnabled(enabled)` — persist round-trip preference
-
-### UI Models (defined in same file)
-- `RouteListItem` (sealed interface) — `StationItem` | `PoiItem`
-- `StationWithCounts` — id, name, lat/lon, photoCount, issueCount
-- `DailyRouteInfo` — totalDistanceKm, totalTimeMins, waypointCount, polylinePoints
-- `SearchUiState` — Idle | Loading | Success | Error
+## SettingsViewModel
+- **File**: `ui/screens/SettingsViewModel.kt` — **Injects**: `ImportStationsUseCase`, `StationRepository`.
+- **State**: `isLoading`, `uiEvent`. (Observed by the Work screen, which hosts the SnackbarHost.)
+- **Operations**: `importStationsFromCsv(inputStream)` (the screen opens the content stream — no `Context` in the VM), `clearAllData` (deletes photo files + rows).
 
 ---
 
 ## ZoneInspectionViewModel
-
-- **File**: `app/src/main/java/com/example/stationinspector/ui/inspection/ZoneInspectionViewModel.kt`
-- **Scope**: Camera + Gallery screens (shared via SavedStateHandle nav args)
-
-### Injected Dependencies
-- `StationRepository`
-- `FileStorageManager`
-- `CameraXController`
-- `ImageCompressor`
-- `SavedStateHandle` (provides `stationId`)
-
-### State (StateFlow)
-| State | Type | Description |
-|---|---|---|
-| `stationName` | `String` | Loaded from DB for display |
-| `selectedZone` | `PhotoZone` | Currently active zone (default: ENTRANCE) |
-| `zoneCounts` | `List<ZonePhotoCount>` | Per-zone ordinary + defect counts |
-| `photos` | `List<Photo>` | Photos for current station + selected zone |
-
-### Operations
-- `selectZone(zone)` — switch active zone
-- `initializeCamera(lifecycleOwner, surfaceProvider)` — bind CameraX
-- `onZoomChange(zoomChange)` — pinch-to-zoom
-- `setFlashMode(flashMode)` — auto/on/off
-- `capturePhoto(type)` — capture → compress → save to file → save to DB
-- `deletePhoto(photoId)` — delete file + DB record
-
----
+- **File**: `ui/inspection/ZoneInspectionViewModel.kt` — Camera + Gallery (shared via `SavedStateHandle` nav args).
+- **Injects**: `StationRepository`, `FileStorageManager`, `CameraXController`, `ImageCompressor`, `SavedStateHandle`.
+- **State**: `stationName`, `selectedZone`, `zoneCounts`, `photos`.
+- **Operations**: `selectZone`, `initializeCamera`, `onZoomChange`, `setFlashMode`, `capturePhoto` (capture → compress → save file → save row; recycles the bitmap), `deletePhoto` (file + row).
 
 ## ExportViewModel
-
-- **File**: `app/src/main/java/com/example/stationinspector/ui/export/ExportViewModel.kt`
-- **Scope**: Export screen only
-
-### Injected Dependencies
-- `StationRepository`
-- `WorkManager`
-
-### State (StateFlow)
-| State | Type | Description |
-|---|---|---|
-| `state` | `ExportViewState` | unexportedCount, exportState (IDLE/RUNNING/SUCCESS/ERROR), zipUri, photos |
-
-### Operations
-- `setSelectedDate(dateStr)` — set export target date
-- `startExport()` — enqueue `ExportZipWorker`, observe work result
-- `resetState()` — return to IDLE
-
----
-
-## ZoneListViewModel (Legacy)
-
-- **File**: `app/src/main/java/com/example/stationinspector/ui/zone/ZoneListViewModel.kt`
-- **Scope**: Legacy ZoneListScreen
-
-### Injected Dependencies
-- `StationRepository`
-- `SavedStateHandle` (provides `stationId`)
-
-### State (StateFlow)
-| State | Type | Description |
-|---|---|---|
-| `stationName` | `String` | Station display name |
-| `zonesWithCounts` | `List<ZoneWithStats>` | Per-zone photo + issue counts (3 zones) |
-| `totalPhotoCount` | `Int` | All photos across all zones |
-
-### Operations
-- `markStationCompleted()` — update station status to COMPLETED
-
-### Constants
-- `INSPECTION_ZONES`: 3 zones with Ukrainian display names (Вокзал, Зона очікування, WC)
+- **File**: `ui/export/ExportViewModel.kt` — **Injects**: `StationRepository`, `WorkManager`.
+- **State**: `state: ExportViewState` (unexportedCount, exportState, zipUri, photos).
+- **Operations**: `setSelectedDate`, `startExport` (enqueue `ExportZipWorker`), `resetState`.

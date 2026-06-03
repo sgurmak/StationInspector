@@ -46,14 +46,13 @@ The compressor first resizes (maintaining aspect ratio), then iteratively reduce
        {ZoneCzech}/
          {StationName}_1.jpg
    ```
-3. **Zone name mapping** (English enum → Czech folder name):
-   - ENTRANCE / STATION → Nádraží
-   - PLATFORM / WAITING_ROOM → Čekárna
-   - RESTROOM / WC → WC
-4. **Create ZIP** using Zip4j
-5. **Cleanup**: Delete previous export sessions, delete staging directory
-6. **Return**: FileProvider URI for the ZIP file
-7. **Share**: ExportScreen opens Android share intent with the ZIP
+3. **Zone name mapping** (`ZONE_FOLDER`, enum → Czech folder): ENTRANCE → Nádraží, PLATFORM → Čekárna, RESTROOM → WC (other zones fall back to the enum name). Every path segment passes through `sanitizeSegment()` (strips separators/reserved chars, rejects `.`/`..`) so a crafted station name can't escape the staging dir.
+4. Stations are resolved **once** into a map (not one query per photo).
+5. **Create ZIP** with Zip4j inside `use {}`.
+6. **Cleanup**: the staging dir is removed in a `finally` (on success, failure, or cancellation); old `session_*` export dirs are pruned.
+7. **Return** a FileProvider URI; `ExportScreen` opens the Android share intent.
+
+> "Clear storage" deletes photo **files** too: `StationRepository.clearAllData()` → `FileStorageManager.clearAllPhotoFiles()` before deleting rows.
 
 ### ZIP Naming
 Format: `KPI_{dd.MM}.zip` (e.g., `KPI_15.04.zip`)
@@ -68,19 +67,15 @@ Format: `KPI_{dd.MM}.zip` (e.g., `KPI_15.04.zip`)
 
 ## Route Optimization
 
-### Flow (StationListViewModel.optimizeRoute → RouteRepositoryImpl)
+### Flow (RouteViewModel.optimizeRoute → RouteRepository)
 
-1. **Filter**: Only active (non-hidden) items with valid coordinates (lat/lon ≠ 0)
-2. **Detect round-trip**: If first and last items share coordinates
-3. **Build VROOM request**:
-   - Vehicle: start = first item, end = last item (if round-trip)
-   - Jobs: all intermediate items
-4. **Send to ORS** `POST /optimization`
-5. **Parse response**: Extract step order from route steps (type = "job")
-6. **Reconstruct list**: start + sorted intermediates + end
-7. **Persist new order**: Update `orderIndex` for all stations and POIs in DB
-8. **Fetch geometry**: Send reordered coordinates to `POST /directions/driving-car`
-9. **Cache**: Store full route geometry in `route_cache`
+1. **Filter** (VM): active (non-hidden) items with valid coordinates; require ≥3, else snackbar.
+2. The VM maps items to domain `RouteWaypoint(id, isStation, lat, lon)` and calls `routeRepository.optimizeAndFetchGeometry(waypoints): Result<OptimizedRoute>`.
+3. **Impl**: detect round-trip (first/last share coords), build the VROOM request (vehicle start/end + intermediate jobs), `POST /optimization`.
+4. **Reconstruct** via the pure, unit-tested `reconstructOptimizedOrder(waypoints, orderedJobIds)` → start + optimizer-ordered intermediates + end.
+5. The VM maps the optimized order back to station/POI `orderIndex` (by id+isStation, hidden items appended) and persists via `StationRepository`/`PoiRepository` ordering APIs.
+
+> The optimize path no longer does a redundant `/directions` fetch (its polyline was unused and its `hashCode` cache key never hit). Geometry is computed fresh by the daily-route calculation below.
 
 ### Daily Route Calculation (automatic, on routeItems change)
 
@@ -101,18 +96,19 @@ StationName,DD.MM.YYYY
 ```
 Both `;` and `,` delimiters supported. UTF-8 encoding.
 
-### Processing (StationListViewModel.importStationsFromCsv)
+### Processing
+`SettingsScreen` opens the content `InputStream` → `SettingsViewModel.importStationsFromCsv(stream)` → `ImportStationsUseCase` (IO) → `ParseStationsCsvUseCase` (pure). No `Context` in the ViewModel.
 
-1. **Parse** each line into name + date
-2. **Clean station names** (`cleanStationName`):
-   - Extract and preserve parenthetical suffixes (e.g., "(v Čechách)")
-   - Remove abbreviations: `žst.`, `os.n.`
-   - Cut at `" - "` or `"- "` (removes sub-station suffixes)
-   - Re-attach parentheses
-   - Collapse multiple spaces
-3. **Deduplicate** by cleaned name
-4. **Save** each station with status = PENDING
-5. **Seed coordinates** from bundled `stations.json` (220+ Czech stations with pre-mapped lat/lon)
+1. **Stream-parse** line-by-line (`bufferedReader().useLines`, no full-file load → no OOM on a hostile file).
+2. **Clean station names** via `StationNameCleaner` (pure, unit-tested):
+   - Extract/preserve a parenthetical suffix (e.g., "(zastávka)")
+   - Strip `žst.`, `os.n.`
+   - Cut at the first `" - "` / `"- "`
+   - Re-attach parentheses; collapse whitespace
+3. **Deduplicate** by cleaned name (`distinctBy`).
+4. **Save** each station (status = PENDING) and **seed coordinates** from bundled `stations.json`.
+
+`ParseStationsCsvUseCase` and `StationNameCleaner` have thorough unit tests; bad dates are kept as `null` (not dropped).
 
 ### stations.json
 Bundled asset file mapping station names to `{"lat": Double, "lon": Double}`. Used as a fast local geocoding fallback before hitting the ORS geocode API.

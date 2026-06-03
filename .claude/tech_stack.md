@@ -15,6 +15,12 @@
 | **Navigation** | Compose Navigation | (BOM) | NavHost with 4 routes |
 | **Drag & Drop** | compose-reorderable 0.9.6 | — | Reorderable station/POI lists in Map screen |
 | **Icons** | Material Icons Extended | (BOM) | Full icon set |
+| **Test** | JUnit4 | 4.13.2 | Pure-logic unit tests |
+| **Test** | Robolectric | 4.13 | In-memory Room on real SQLite (JVM), `@Config(sdk=[34])` |
+| **Test** | androidx.room:room-testing | 2.6.1 | MigrationTestHelper (future migrations) |
+| **Test** | mockk | 1.13.12 | ViewModel fakes |
+| **Test** | kotlinx-coroutines-test | 1.8.1 | `runTest`, `StandardTestDispatcher` |
+| **Test** | androidx.test:core-ktx | 1.6.1 | `ApplicationProvider` |
 
 ## Build Configuration
 
@@ -22,5 +28,6 @@
 - **JVM Target**: 11
 - **Compose**: enabled via Kotlin Compose plugin
 - **BuildConfig**: enabled (used for Mapy.cz API key from `local.properties`)
-- **KSP**: used for Room and Hilt annotation processing
+- **KSP**: used for Room and Hilt annotation processing; Room `exportSchema = true` → `app/schemas/`
 - **ProGuard**: not enabled for release builds (`isMinifyEnabled = false`)
+- **Unit tests**: JVM via `gradlew testDebugUnitTest`; `testOptions.unitTests.isReturnDefaultValues = true` + `isIncludeAndroidResources = true` (Robolectric). Forked test JVMs receive a TLS truststore via the `testTrustStore` project property (see `Claude.md` → Build & test).
