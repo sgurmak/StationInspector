@@ -3,7 +3,7 @@
 | Category | Library | Version | Role |
 |---|---|---|---|
 | **DI** | Dagger Hilt | 2.52 | `@HiltAndroidApp`, `@HiltViewModel`, `@HiltWorker` |
-| **Database** | Room | 2.6.1 | 5 tables, 8 migrations, KSP annotation processor |
+| **Database** | Room | 2.6.1 | 6 tables, 9 migrations, KSP annotation processor |
 | **Preferences** | DataStore Preferences | 1.0.0 | User settings (round-trip toggle) |
 | **Networking** | Retrofit 2.9 + OkHttp 4.12 + Gson | — | Two API clients: OpenRouteService + Mapy.cz |
 | **Maps** | osmdroid 6.1.18 | — | Mapy.cz tile source, polylines, numbered markers |

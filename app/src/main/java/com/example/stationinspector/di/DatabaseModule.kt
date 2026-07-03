@@ -10,6 +10,7 @@ import com.example.stationinspector.data.local.dao.StationDao
 import com.example.stationinspector.data.local.dao.RouteCacheDao
 import com.example.stationinspector.data.local.dao.PoiDao
 import com.example.stationinspector.data.local.dao.ShortcutDao
+import com.example.stationinspector.data.local.dao.StationCoordinateOverrideDao
 import com.example.stationinspector.data.remote.OrsApiService
 import com.example.stationinspector.data.repository.PoiRepositoryImpl
 import com.example.stationinspector.data.repository.PreferencesRepositoryImpl
@@ -49,7 +50,7 @@ object DatabaseModule {
             AppDatabase::class.java,
             AppDatabase.DATABASE_NAME
         )
-        .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7, AppDatabase.MIGRATION_7_8)
+        .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7, AppDatabase.MIGRATION_7_8, AppDatabase.MIGRATION_8_9)
         .apply {
             // Destructive fallback only in debug builds. A release build must
             // never silently wipe inspection data — a missing migration path
@@ -96,13 +97,20 @@ object DatabaseModule {
 
     @Provides
     @Singleton
+    fun provideStationCoordinateOverrideDao(db: AppDatabase): StationCoordinateOverrideDao {
+        return db.stationCoordinateOverrideDao
+    }
+
+    @Provides
+    @Singleton
     fun provideStationRepository(
         stationDao: StationDao,
         photoDao: PhotoDao,
+        coordinateOverrideDao: StationCoordinateOverrideDao,
         fileStorageManager: FileStorageManager,
         @ApplicationContext context: Context
     ): StationRepository {
-        return StationRepositoryImpl(stationDao, photoDao, fileStorageManager, context)
+        return StationRepositoryImpl(stationDao, photoDao, coordinateOverrideDao, fileStorageManager, context)
     }
 
     @Provides

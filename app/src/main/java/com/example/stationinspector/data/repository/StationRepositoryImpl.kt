@@ -2,7 +2,9 @@ package com.example.stationinspector.data.repository
 
 import android.content.Context
 import com.example.stationinspector.data.local.dao.PhotoDao
+import com.example.stationinspector.data.local.dao.StationCoordinateOverrideDao
 import com.example.stationinspector.data.local.dao.StationDao
+import com.example.stationinspector.data.local.entity.StationCoordinateOverrideEntity
 import com.example.stationinspector.data.mapper.toDomain
 import com.example.stationinspector.data.mapper.toEntity
 import com.example.stationinspector.data.storage.FileStorageManager
@@ -21,6 +23,7 @@ import javax.inject.Inject
 class StationRepositoryImpl @Inject constructor(
     private val stationDao: StationDao,
     private val photoDao: PhotoDao,
+    private val coordinateOverrideDao: StationCoordinateOverrideDao,
     private val fileStorageManager: FileStorageManager,
     @ApplicationContext private val context: Context
 ) : StationRepository {
@@ -60,6 +63,14 @@ class StationRepositoryImpl @Inject constructor(
 
     override suspend fun updateStationCoordinates(stationId: Long, lat: Double, lon: Double) {
         stationDao.updateStationCoordinates(stationId, lat, lon)
+        // Persist the correction keyed by station name so it survives a
+        // clear-all + CSV re-import (which regenerates station ids) and is
+        // re-applied by applyCoordinateOverrides().
+        stationDao.getStationByIdSync(stationId)?.let { station ->
+            coordinateOverrideDao.upsert(
+                StationCoordinateOverrideEntity(station.name, lat, lon)
+            )
+        }
     }
 
     override suspend fun getStationsForDateSync(date: java.time.LocalDate): List<Station> {
@@ -88,6 +99,9 @@ class StationRepositoryImpl @Inject constructor(
         // Then the rows (photos hold a FK to stations, so photos before stations).
         photoDao.deleteAllPhotos()
         stationDao.deleteAllStations()
+        // NOTE: station_coord_overrides is intentionally NOT cleared here. Manual
+        // coordinate corrections are meant to survive a clear + re-import and are
+        // re-applied by name via applyCoordinateOverrides().
     }
 
     override suspend fun seedCoordinatesIfMissing() = withContext(Dispatchers.IO) {
@@ -111,6 +125,23 @@ class StationRepositoryImpl @Inject constructor(
             stationDao.updateStations(updatedStations)
         }
     }
+
+    override suspend fun applyCoordinateOverrides() = withContext(Dispatchers.IO) {
+        val overrides = coordinateOverrideDao.getAll()
+        if (overrides.isEmpty()) return@withContext
+        val overrideByName = overrides.associateBy { it.stationName }
+        val updated = stationDao.getAllStationsSync().mapNotNull { station ->
+            val o = overrideByName[station.name] ?: return@mapNotNull null
+            // Skip rows that already match, so we don't churn the DB needlessly.
+            if (station.latitude == o.latitude && station.longitude == o.longitude) {
+                null
+            } else {
+                station.copy(latitude = o.latitude, longitude = o.longitude)
+            }
+        }
+        if (updated.isNotEmpty()) stationDao.updateStations(updated)
+    }
+
     override fun getPhotosForStation(stationId: Long): Flow<List<Photo>> {
         return photoDao.getPhotosForStation(stationId).map { entities ->
             entities.map { it.toDomain() }

@@ -21,6 +21,13 @@ interface StationRepository {
 
     suspend fun seedCoordinatesIfMissing()
 
+    /**
+     * Re-applies any manually-corrected coordinates (stored per station name and
+     * kept across "clear all data") onto the currently-imported stations. Manual
+     * overrides win over both CSV-provided and asset-seeded coordinates.
+     */
+    suspend fun applyCoordinateOverrides()
+
     fun getPhotosForStation(stationId: Long): Flow<List<Photo>>
     fun getPhotosByStationAndZone(stationId: Long, zone: String): Flow<List<Photo>>
     fun getAllPhotos(): Flow<List<Photo>>

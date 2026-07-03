@@ -43,6 +43,10 @@ class ImportStationsUseCase @Inject constructor(
             }
 
             stationRepository.seedCoordinatesIfMissing()
+            // Re-apply manual coordinate corrections (kept across clear-all) so a
+            // re-import restores hand-dragged positions instead of the CSV/asset
+            // defaults. Runs last: overrides win over both.
+            stationRepository.applyCoordinateOverrides()
             stations.size
         }
     }

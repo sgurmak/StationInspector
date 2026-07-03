@@ -10,7 +10,7 @@ ViewModels in `ui/screens/`. UI models (`RouteListItem`/`StationItem`/`PoiItem`,
 - **Scope**: shared instance across the Work and Map tabs (same `NavBackStackEntry`).
 - **Injects**: `StationRepository`, `RouteRepository`, `PoiRepository`, `PreferencesRepository`, `ShortcutRepository`, `TransactionRunner`, `@IoDispatcher CoroutineDispatcher`. (No DAOs, no `AppDatabase`, no `Dispatchers.IO` hardcoded.)
 - **State**: `selectedDate`, `availableDates`, `routeItems`, `stableRouteDate`, `routeInfo`, `isExportButtonEnabled`, `editingPoi`, `isOptimizing`, `isRoundTripEnabled`, `mapExpandedByDate`, `uiEvent` (snackbars).
-- **Operations**: `onDateSelected`, `setRoundTripEnabled`, `optimizeRoute` (maps items→`RouteWaypoint`, applies the optimized order back by id+isStation), `addPoiToRoute`, `addShortcutToRoute` (Home/round-trip logic), `toggleHidePoi`, `deletePoi`, `startEditingPoi`/`cancelEditingPoi`/`saveEditedPoi`, `reorderItems`, scroll persistence, `toggleMapExpanded`, `onInspectionConfirmed`. Private `rebuildHomePointsAndIndices`/`insertPoiAtCorrectOrderIndex`/`calculateDailyRoute`.
+- **Operations**: `onDateSelected`, `setRoundTripEnabled`, `optimizeRoute` (maps items→`RouteWaypoint`, applies the optimized order back by id+isStation), `addPoiToRoute`, `addShortcutToRoute` (Home/round-trip logic), `toggleHidePoi`, `deletePoi`, `startEditingPoi`/`cancelEditingPoi`/`saveEditedPoi` (for a station, persists the new lat/lon **and** records a per-name override in `station_coord_overrides` so it survives a clear + re-import), `reorderItems`, scroll persistence, `toggleMapExpanded`, `onInspectionConfirmed`. Private `rebuildHomePointsAndIndices`/`insertPoiAtCorrectOrderIndex`/`calculateDailyRoute`.
 
 ## SearchViewModel
 - **File**: `ui/screens/SearchViewModel.kt` — **Injects**: `MapyCzRepository`.
@@ -25,7 +25,7 @@ ViewModels in `ui/screens/`. UI models (`RouteListItem`/`StationItem`/`PoiItem`,
 ## SettingsViewModel
 - **File**: `ui/screens/SettingsViewModel.kt` — **Injects**: `ImportStationsUseCase`, `StationRepository`.
 - **State**: `isLoading`, `uiEvent`. (Observed by the Work screen, which hosts the SnackbarHost.)
-- **Operations**: `importStationsFromCsv(inputStream)` (the screen opens the content stream — no `Context` in the VM), `clearAllData` (deletes photo files + rows).
+- **Operations**: `importStationsFromCsv(inputStream)` (the screen opens the content stream — no `Context` in the VM), `clearAllData` (deletes photo files + rows, but **keeps** `station_coord_overrides` so manual coordinate fixes survive a clear + re-import).
 
 ---
 

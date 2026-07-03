@@ -6,7 +6,7 @@
 ## Technology stack (key)
 - **Language**: Kotlin 2.0.21, Jetpack Compose + Material 3
 - **DI**: Dagger Hilt 2.52 (4 modules: `AppModule`, `DatabaseModule`, `NetworkModule`, `DispatchersModule`)
-- **Database**: Room 2.6.1 (5 tables, 8 migrations, KSP, `exportSchema = true` → `app/schemas/`)
+- **Database**: Room 2.6.1 (6 tables, 9 migrations, KSP, `exportSchema = true` → `app/schemas/`)
 - **Network**: Retrofit 2.9 + OkHttp 4.12 — two APIs: OpenRouteService (routing/optimization/geocoding) and Mapy.cz (location search + map tiles)
 - **Camera**: CameraX 1.4.0, Preview + ImageCapture only (no ImageAnalysis/face detection), custom JPEG compression pipeline
 - **Maps**: osmdroid 6.1.18 with Mapy.cz tile source (Czech Republic bounds), 7-day tile cache

@@ -2,8 +2,8 @@
 
 **Engine**: Room 2.6.1  
 **DB Name**: `station_inspector_db`  
-**Current Version**: 8  
-**Export Schema**: enabled (`exportSchema = true` → `app/schemas/`, the v8 JSON is committed)  
+**Current Version**: 9  
+**Export Schema**: enabled (`exportSchema = true` → `app/schemas/`, the v9 JSON is committed)  
 
 ## Tables
 
@@ -69,6 +69,18 @@
 | `isNew` | Boolean | True if no address assigned |
 | `isRoundTrip` | Boolean | Default false, only meaningful for Home |
 
+### `station_coord_overrides` → `StationCoordinateOverrideEntity`
+| Column | Type | Notes |
+|---|---|---|
+| `stationName` | String | PK — station name (import ids are regenerated, so name is the join key) |
+| `latitude` | Double | Manually corrected latitude |
+| `longitude` | Double | Manually corrected longitude |
+
+Persistent store for **manual coordinate corrections** (inspector drags a station
+marker on the map). Deliberately **NOT** wiped by `clearAllData()`, so a hand-fixed
+position survives a "clear all data" + CSV re-import cycle. One row per station
+name (`OnConflictStrategy.REPLACE` — re-editing overwrites, never duplicates).
+
 ## Result Classes (not tables)
 
 - **`StationWithSplitCounts`** — `@Embedded StationEntity` + `regularCount: Int` (CLIENT_REPORT) + `issueCount: Int` (INTERNAL_DEFECT). Mapped to the domain `StationWithSplitCountsDomain`.
@@ -80,6 +92,7 @@
 - `photos.stationId` → `stations.id` (FK with CASCADE delete)
 - `pois` linked to work days via `inspectionDate` column
 - `shortcuts` store serialized `PoiItem` JSON for quick-add actions on the Map screen
+- `station_coord_overrides` joins to `stations` **by name** (no FK) — applied after import via `StationRepository.applyCoordinateOverrides()`
 
 ## TypeConverters
 
@@ -100,6 +113,7 @@
 | 5→6 | Create `shortcuts` table |
 | 6→7 | Empty migration (version bump) |
 | 7→8 | Add `orderIndex` to `stations`; **add `isRoundTrip` to `shortcuts`** (this column was declared on the entity but missing from the migration chain — fixed); drop & recreate `pois` with the new string-keyed schema |
+| 8→9 | Create `station_coord_overrides` table (persistent manual coordinate corrections) |
 
 `MIGRATION_7_8` is covered by `MigrationTest` (Robolectric, real SQLite): it reconstructs the v7 state and asserts the new columns plus data preservation. Historical schemas (v1–v7) were never exported, so test **new** migrations going forward with `MigrationTestHelper`.
 
@@ -112,6 +126,7 @@
 - **RouteCacheDao**: `insertRouteCache` + `getRouteCacheById`
 - **PoiDao**: insert + `getPoisForDate`(Flow)/`getPoisForDateSync` + `updatePoiOrders` (transaction) + `deletePoi`/`deletePoisByNameAndDate`
 - **ShortcutDao**: CRUD + `clearOldBlankShortcuts` + `getShortcutCount`
+- **StationCoordinateOverrideDao**: `upsert` (REPLACE) + `getAll` + `deleteAll`
 
 DAOs are not injected into the UI layer; ViewModels go through repositories
 (`StationRepository` exposes the station-ordering + `getStationsForDateSync`

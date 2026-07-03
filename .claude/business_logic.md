@@ -52,7 +52,7 @@ The compressor first resizes (maintaining aspect ratio), then iteratively reduce
 6. **Cleanup**: the staging dir is removed in a `finally` (on success, failure, or cancellation); old `session_*` export dirs are pruned.
 7. **Return** a FileProvider URI; `ExportScreen` opens the Android share intent.
 
-> "Clear storage" deletes photo **files** too: `StationRepository.clearAllData()` → `FileStorageManager.clearAllPhotoFiles()` before deleting rows.
+> "Clear storage" deletes photo **files** too: `StationRepository.clearAllData()` → `FileStorageManager.clearAllPhotoFiles()` before deleting rows. It deliberately **keeps** the `station_coord_overrides` table so manual coordinate corrections survive a clear + re-import (see CSV Import step 5).
 
 ### ZIP Naming
 Format: `KPI_{dd.MM}.zip` (e.g., `KPI_15.04.zip`)
@@ -107,6 +107,7 @@ Both `;` and `,` delimiters supported. UTF-8 encoding.
    - Re-attach parentheses; collapse whitespace
 3. **Deduplicate** by cleaned name (`distinctBy`).
 4. **Save** each station (status = PENDING) and **seed coordinates** from bundled `stations.json`.
+5. **Re-apply manual coordinate overrides** (`applyCoordinateOverrides()`): any station whose name matches a row in `station_coord_overrides` gets its hand-corrected lat/lon back. Overrides **win** over both the CSV and `stations.json` defaults, so a re-import after "clear storage" restores dragged-in positions instead of resetting them. Matching is by **station name** (import ids are regenerated each time).
 
 `ParseStationsCsvUseCase` and `StationNameCleaner` have thorough unit tests; bad dates are kept as `null` (not dropped).
 

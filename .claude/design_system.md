@@ -71,8 +71,8 @@ remain (e.g. `CardBg`, `DateCircleSel`).
 | Category | Count |
 |---|---|
 | Kotlin source files (main) | ~70 |
-| Room entities | 6 (5 tables + 1 result class `StationWithSplitCounts`) |
-| Room DAOs | 5 |
+| Room entities | 7 (6 tables + 1 result class `StationWithSplitCounts`) |
+| Room DAOs | 6 |
 | ViewModels | 6 (Route/Search/Shortcuts/Settings + ZoneInspection + Export) |
 | Use cases | 3 (StationNameCleaner, ParseStationsCsv, ImportStations) |
 | DI modules | 4 (App, Database, Network, Dispatchers) |

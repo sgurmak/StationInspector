@@ -14,10 +14,12 @@ import com.example.stationinspector.data.local.dao.RouteCacheDao
 import com.example.stationinspector.data.local.dao.PoiDao
 import com.example.stationinspector.data.local.entity.ShortcutEntity
 import com.example.stationinspector.data.local.dao.ShortcutDao
+import com.example.stationinspector.data.local.entity.StationCoordinateOverrideEntity
+import com.example.stationinspector.data.local.dao.StationCoordinateOverrideDao
 
 @Database(
-    entities = [StationEntity::class, PhotoEntity::class, RouteCacheEntity::class, PoiEntity::class, ShortcutEntity::class],
-    version = 8,
+    entities = [StationEntity::class, PhotoEntity::class, RouteCacheEntity::class, PoiEntity::class, ShortcutEntity::class, StationCoordinateOverrideEntity::class],
+    version = 9,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -28,6 +30,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract val routeCacheDao: RouteCacheDao
     abstract val poiDao: PoiDao
     abstract val shortcutDao: ShortcutDao
+    abstract val stationCoordinateOverrideDao: StationCoordinateOverrideDao
 
     companion object {
         const val DATABASE_NAME = "station_inspector_db"
@@ -79,6 +82,15 @@ abstract class AppDatabase : RoomDatabase() {
                 database.execSQL("ALTER TABLE shortcuts ADD COLUMN isRoundTrip INTEGER NOT NULL DEFAULT 0")
                 database.execSQL("DROP TABLE pois")
                 database.execSQL("CREATE TABLE IF NOT EXISTS `pois` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `city` TEXT, `address` TEXT, `region` TEXT, `latitude` REAL NOT NULL, `longitude` REAL NOT NULL, `inspectionDate` TEXT NOT NULL, `orderIndex` INTEGER NOT NULL, PRIMARY KEY(`id`))")
+            }
+        }
+
+        val MIGRATION_8_9 = object : androidx.room.migration.Migration(8, 9) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                // Persistent store for manual coordinate corrections. Keyed by
+                // station name so it can be re-applied after a clear + re-import
+                // (station ids are regenerated on every import).
+                database.execSQL("CREATE TABLE IF NOT EXISTS `station_coord_overrides` (`stationName` TEXT NOT NULL, `latitude` REAL NOT NULL, `longitude` REAL NOT NULL, PRIMARY KEY(`stationName`))")
             }
         }
     }
